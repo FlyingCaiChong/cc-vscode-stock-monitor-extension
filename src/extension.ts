@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
-import { onConfigChanged, readConfig, StockMonitorConfig } from "./config";
+import {
+  CONFIG_SECTION,
+  onConfigChanged,
+  readConfig,
+  StockMonitorConfig,
+} from "./config";
 import { logger } from "./logger";
 import { QuoteService } from "./market/quoteService";
 import { MARKET_LABEL, parseStockCode } from "./market/stockCode";
@@ -18,12 +23,7 @@ import { WatchListStore } from "./watchListStore";
 /** 树视图 ID，需与 package.json 中 contributes.views 保持一致 */
 const VIEW_ID = "stockMonitorWatchList";
 
-/**
- * 持仓数据的持久化键（globalState）。
- * 刻意不复用 `WorkspaceConfiguration.update()` 写 settings.json：
- * 当用户 settings.json 存在校验错误、配置项未注册或文件只读时，
- * 该调用会直接抛错导致命令执行失败；globalState 始终可写。
- */
+/** 旧版本持仓缓存键，仅用于兼容迁移 */
 const POSITION_STORAGE_KEY = "stockMonitor.positions";
 
 /** 刷新触发来源，用于决定错误提示策略 */
@@ -92,6 +92,9 @@ class StockMonitorController implements vscode.Disposable {
   /** 上一次已弹窗提示的错误码，用于抑制轮询期间的重复打扰 */
   private lastNotifiedError: QuoteErrorCode | undefined;
 
+  /** 启动时是否需要把旧版持仓缓存回填到 settings.json */
+  private needsPositionConfigBackfill = false;
+
   constructor(private readonly context: vscode.ExtensionContext) {
     this.config = readConfig();
     this.store = new WatchListStore(context, this.config.initialWatchList);
@@ -134,8 +137,33 @@ class StockMonitorController implements vscode.Disposable {
     );
 
     this.render();
+    void this.backfillLegacyConfigIfNeeded();
     void this.refresh("startup");
     this.scheduleTimer();
+  }
+
+  /** 读取未加默认值的原始配置项，用于判断用户是否真的写入了 settings.json */
+  private readRawConfigValue<T>(key: string): T | undefined {
+    return vscode.workspace.getConfiguration(CONFIG_SECTION).get<T>(key);
+  }
+
+  /**
+   * 启动后把旧版缓存或默认值回填到 settings.json。
+   *
+   * 这样可以保证：
+   * 1. 用户在 settings.json 中看到的内容与界面一致
+   * 2. 旧版本遗留在 globalState 的数据能平滑迁移到新版本配置
+   */
+  private async backfillLegacyConfigIfNeeded(): Promise<void> {
+    try {
+      await this.store.backfillConfigIfNeeded();
+      if (this.needsPositionConfigBackfill) {
+        await this.persistPositions();
+        this.needsPositionConfigBackfill = false;
+      }
+    } catch (err) {
+      logger.error("回填配置到 settings.json 失败", err);
+    }
   }
 
   /** 立即渲染界面（不触发网络请求） */
@@ -150,59 +178,69 @@ class StockMonitorController implements vscode.Disposable {
   }
 
   /**
-   * 加载持仓数据：优先读取 globalState，首次启动（尚无本地数据）时用
-   * 配置项 `stockMonitor.positions` 初始化并落盘，之后完全由命令维护。
+   * 加载持仓数据：优先读取 settings.json。
+   *
+   * 兼容逻辑：
+   * - 若用户已在 settings.json 中配置 `stockMonitor.positions`，则完全以其为准
+   * - 若配置项尚未写入，但旧版本 globalState 中已有数据，则先恢复到内存并在启动后回填到 settings.json
    */
   private loadPositions(): void {
+    const configured = this.readRawConfigValue<unknown>("positions");
     const saved = this.context.globalState.get<unknown>(POSITION_STORAGE_KEY);
-    const source = saved === undefined ? this.config.positions : saved;
+    const source =
+      configured === undefined && saved !== undefined ? saved : configured;
     const { positions, issues } = normalizePositions(source);
     this.logPositionIssues(issues);
     this.positions = positions;
-    this.positionsConfigSnapshot = JSON.stringify(
-      this.config.positions ?? null,
-    );
-    if (saved === undefined) {
-      // 把配置项里的初始值固化到本地，避免下次启动重复解析配置
-      void this.persistPositions();
+    this.positionsConfigSnapshot = JSON.stringify(source ?? null);
+    if (configured === undefined && saved !== undefined) {
+      this.needsPositionConfigBackfill = true;
+      logger.info(
+        `已从旧版本地缓存恢复持仓配置，共 ${positions.size} 只股票，稍后将回填到 settings.json`,
+      );
     }
     if (positions.size > 0) {
       logger.info(`已加载持仓配置，共 ${positions.size} 只股票`);
     }
   }
 
-  /** 把持仓数据写入 globalState；返回 Promise 以便调用方感知写入失败 */
-  private persistPositions(): Thenable<void> {
+  /**
+   * 把持仓数据写入 settings.json，并同步写入旧版缓存键以兼容历史数据。
+   *
+   * 说明：
+   * - settings.json 是新的主数据源，用户可直接看到、编辑、同步
+   * - globalState 仅作为兼容缓存，避免旧版本升级后历史数据丢失
+   */
+  private async persistPositions(): Promise<void> {
     const list = [...this.positions.values()].map((setting) => ({
       code: setting.key,
       alias: setting.alias,
       costPrice: setting.costPrice,
       shares: setting.shares,
     }));
-    return this.context.globalState.update(POSITION_STORAGE_KEY, list);
+    const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+    await cfg.update("positions", list, vscode.ConfigurationTarget.Global);
+    await this.context.globalState.update(POSITION_STORAGE_KEY, list);
+    this.positionsConfigSnapshot = JSON.stringify(list);
   }
 
   /**
-   * 合并配置项 `stockMonitor.positions`。
-   * 仅在该配置项相比上次读取确实发生变化时执行，配置中的条目覆盖同名持仓；
-   * 这样既支持直接编辑 settings.json，又不会因修改其它配置项而覆盖命令设置的持仓。
+   * 用 settings.json 中的持仓配置覆盖当前内存态。
+   *
+   * 这样用户直接编辑 settings.json 时，界面会立即与配置保持一致，
+   * 不再出现“settings.json 和展示内容不一致”的情况。
    */
   private mergeConfigPositions(): void {
-    const snapshot = JSON.stringify(this.config.positions ?? null);
+    const raw = this.readRawConfigValue<unknown>("positions");
+    const snapshot = JSON.stringify(raw ?? null);
     if (snapshot === this.positionsConfigSnapshot) {
       return;
     }
     this.positionsConfigSnapshot = snapshot;
-    const { positions, issues } = normalizePositions(this.config.positions);
+    const { positions, issues } = normalizePositions(raw);
     this.logPositionIssues(issues);
-    if (positions.size === 0) {
-      return;
-    }
-    for (const [key, setting] of positions) {
-      this.positions.set(key, setting);
-    }
-    void this.persistPositions();
-    logger.info(`已从配置项同步 ${positions.size} 条持仓设置`);
+    this.positions = positions;
+    logger.info(`已从 settings.json 同步持仓配置，共 ${positions.size} 只股票`);
   }
 
   /** 输出持仓配置的容错提示（非法条目不阻断插件运行） */
@@ -289,6 +327,7 @@ class StockMonitorController implements vscode.Disposable {
   /** 配置变更时重新读取并热更新 */
   private applyConfig(): void {
     this.config = readConfig();
+    this.store.syncFromConfig(this.config.initialWatchList);
     this.mergeConfigPositions();
     logger.info(
       `配置已更新：刷新间隔 ${this.config.refreshInterval}s，配色 ${this.config.colorScheme}，状态栏上限 ${this.config.maxStatusBarItems}`,
@@ -352,7 +391,7 @@ class StockMonitorController implements vscode.Disposable {
         );
         return;
       }
-      const failure = this.store.add({
+      const failure = await this.store.add({
         ...code,
         name: quote.name,
         favorite: false,
@@ -383,7 +422,11 @@ class StockMonitorController implements vscode.Disposable {
         return;
       }
       // 网络类问题不应阻止添加，后续轮询会自动补上数据
-      const failure = this.store.add({ ...code, name: "", favorite: false });
+      const failure = await this.store.add({
+        ...code,
+        name: "",
+        favorite: false,
+      });
       if (failure) {
         void vscode.window.showInformationMessage(`Stock Monitor：${failure}`);
         return;
@@ -399,19 +442,21 @@ class StockMonitorController implements vscode.Disposable {
   private async removeStock(node?: unknown): Promise<void> {
     const target = toWatchedStock(node);
     if (target) {
-      this.store.remove(target.key);
-      void vscode.window.showInformationMessage(
-        `Stock Monitor：已移除 ${this.displayNameOf(target)}`,
-      );
+      if (await this.store.remove(target.key)) {
+        void vscode.window.showInformationMessage(
+          `Stock Monitor：已移除 ${this.displayNameOf(target)}`,
+        );
+      }
       return;
     }
 
     const picked = await this.pickStock("移除关注股票", "选择要移除的股票");
     if (picked) {
-      this.store.remove(picked.key);
-      void vscode.window.showInformationMessage(
-        `Stock Monitor：已移除 ${this.displayNameOf(picked)}`,
-      );
+      if (await this.store.remove(picked.key)) {
+        void vscode.window.showInformationMessage(
+          `Stock Monitor：已移除 ${this.displayNameOf(picked)}`,
+        );
+      }
     }
   }
 
@@ -419,7 +464,7 @@ class StockMonitorController implements vscode.Disposable {
   private async toggleFavorite(node?: unknown): Promise<void> {
     const target = toWatchedStock(node);
     if (target) {
-      const favorite = this.store.toggleFavorite(target.key);
+      const favorite = await this.store.toggleFavorite(target.key);
       if (favorite !== undefined) {
         void vscode.window.showInformationMessage(
           `Stock Monitor：${favorite ? "已收藏" : "已取消收藏"} ${this.displayNameOf(target)}`,
@@ -433,16 +478,18 @@ class StockMonitorController implements vscode.Disposable {
       "选择要切换收藏状态的股票",
     );
     if (picked) {
-      const favorite = this.store.toggleFavorite(picked.key);
-      void vscode.window.showInformationMessage(
-        `Stock Monitor：${favorite ? "已收藏" : "已取消收藏"} ${this.displayNameOf(picked)}`,
-      );
+      const favorite = await this.store.toggleFavorite(picked.key);
+      if (favorite !== undefined) {
+        void vscode.window.showInformationMessage(
+          `Stock Monitor：${favorite ? "已收藏" : "已取消收藏"} ${this.displayNameOf(picked)}`,
+        );
+      }
     }
   }
 
   /**
    * 设置持仓：通过连续输入框维护别名、成本价与持仓数量，
-   * 结果写入 globalState（不写 settings.json，避免因配置校验失败导致命令报错）。
+   * 结果写入 settings.json，使配置文件与界面展示保持一致。
    */
   private async setPosition(node?: unknown): Promise<void> {
     const target =
