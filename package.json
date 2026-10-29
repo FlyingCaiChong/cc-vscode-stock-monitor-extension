@@ -100,6 +100,16 @@
           "maximum": 20,
           "description": "状态栏最多展示的股票数量，收藏的股票优先展示"
         },
+        "stockMonitor.showPortfolioSummary": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否在状态栏展示全部持仓的当日参考盈亏汇总项"
+        },
+        "stockMonitor.portfolioSummaryLabel": {
+          "type": "string",
+          "default": "参考盈亏",
+          "description": "持仓汇总状态栏项的文案前缀，例如“参考盈亏”或“总当日盈亏”"
+        },
         "stockMonitor.displayFields": {
           "type": "array",
           "items": {

@@ -48,6 +48,10 @@ export interface StockMonitorConfig {
   statusBarPriority: number;
   /** 状态栏最多展示的股票数量 */
   maxStatusBarItems: number;
+  /** 是否展示持仓汇总状态栏项 */
+  showPortfolioSummary: boolean;
+  /** 持仓汇总状态栏项文案 */
+  portfolioSummaryLabel: string;
   /** 状态栏展示字段及顺序 */
   displayFields: DisplayField[];
   /** 涨跌配色方案 */
@@ -123,6 +127,15 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
+/** 规范化非空文案，空字符串时回退默认值 */
+function normalizeLabel(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
 /** 读取并规范化当前工作区配置 */
 export function readConfig(): StockMonitorConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
@@ -131,6 +144,8 @@ export function readConfig(): StockMonitorConfig {
     statusBarAlignment: cfg.get<StatusBarAlignment>('statusBarAlignment', 'left'),
     statusBarPriority: cfg.get<number>('statusBarPriority', 100),
     maxStatusBarItems: clamp(cfg.get<number>('maxStatusBarItems', 6), 1, 20),
+    showPortfolioSummary: cfg.get<boolean>('showPortfolioSummary', true),
+    portfolioSummaryLabel: normalizeLabel(cfg.get<string>('portfolioSummaryLabel', '参考盈亏'), '参考盈亏'),
     displayFields: cfg.get<DisplayField[]>('displayFields', ['name', 'price', 'changePercent']),
     colorScheme: cfg.get<ColorScheme>('colorScheme', 'greenUp'),
     upColor: normalizeHexColor(cfg.get<string>('upColor', '')),

@@ -30,6 +30,8 @@ suite('Stock Monitor 扩展冒烟测试', () => {
     const config = vscode.workspace.getConfiguration('stockMonitor');
     assert.strictEqual(config.get('refreshInterval'), 10);
     assert.strictEqual(config.get('colorScheme'), 'greenUp');
+    assert.strictEqual(config.get('showPortfolioSummary'), true);
+    assert.strictEqual(config.get('portfolioSummaryLabel'), '参考盈亏');
     assert.strictEqual(config.get('upColor'), '');
     assert.strictEqual(config.get('downColor'), '');
     assert.deepStrictEqual(config.get('stockColors'), []);

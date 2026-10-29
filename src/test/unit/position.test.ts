@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { computePosition, hasPosition, normalizePositions, PositionSetting } from '../../position';
+import { computePortfolioSummary, computePosition, hasPosition, normalizePositions, PositionSetting } from '../../position';
 import { formatSignedAmount, positionRows } from '../../ui/format';
 import { Quote } from '../../types';
 
@@ -156,6 +156,48 @@ suite('position / computePosition', () => {
       assert.strictEqual(metrics.shares, undefined, `shares=${shares} 不应参与计算`);
       assert.strictEqual(metrics.dailyProfit, undefined);
     }
+  });
+});
+
+suite('position / computePortfolioSummary', () => {
+  test('汇总全部已配置持仓且已有行情的当日参考盈亏', () => {
+    const quotes = new Map([
+      [
+        'sh600519',
+        makeQuote(),
+      ],
+      [
+        'sz300866',
+        makeQuote({
+          key: 'sz300866',
+          code: '300866',
+          market: 'sz',
+          name: '安克创新',
+          price: 111.99,
+          prevClose: 110.6,
+          change: 1.39,
+          changePercent: 1.26,
+        }),
+      ],
+    ]);
+    const { positions } = normalizePositions([
+      { code: 'sh600519', costPrice: 1200, shares: 100 },
+      { code: 'sz300866', costPrice: 100, shares: 200 },
+      { code: 'AAPL', costPrice: 180, shares: 10 },
+    ]);
+
+    const summary = computePortfolioSummary(quotes, positions);
+    assert.ok(summary, '存在可计算持仓时应返回汇总结果');
+    assert.strictEqual(summary?.count, 2);
+    assertClose(summary?.marketValue, 133075 + 111.99 * 200, '汇总持仓市值');
+    assertClose(summary?.dailyProfit, -2515 + (111.99 - 110.6) * 200, '汇总当日参考盈亏');
+    assertClose(summary?.totalProfit, 13075 + (111.99 - 100) * 200, '汇总持仓总收益');
+  });
+
+  test('无可计算持仓时返回 undefined', () => {
+    const quotes = new Map([['sh600519', makeQuote()]]);
+    const { positions } = normalizePositions([{ code: 'sh600519', alias: '茅台' }]);
+    assert.strictEqual(computePortfolioSummary(quotes, positions), undefined);
   });
 });
 

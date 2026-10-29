@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { MARKET_LABEL } from '../market/stockCode';
 import { StockMonitorConfig } from '../config';
-import { computePosition, PositionMap, PositionMetrics } from '../position';
+import { computePortfolioSummary, computePosition, PortfolioSummary, PositionMap, PositionMetrics } from '../position';
 import { Quote, WatchedStock } from '../types';
-import { colorIdForStock, detailRows, formatStatusBarText, positionRows, trendOf } from './format';
+import { colorIdFor, colorIdForStock, detailRows, formatAmount, formatSignedAmount, formatStatusBarText, positionRows, trendOf } from './format';
 
 /**
  * 状态栏管理器：为关注列表中的每只股票维护一个 StatusBarItem。
@@ -19,6 +19,8 @@ export class StatusBarManager {
 
   private placeholder: vscode.StatusBarItem | undefined;
 
+  private summaryItem: vscode.StatusBarItem | undefined;
+
   private signature = '';
 
   constructor(private readonly emptyCommand: string) {}
@@ -33,6 +35,7 @@ export class StatusBarManager {
     const signature = `${config.statusBarAlignment}|${config.statusBarPriority}`;
     if (this.signature !== signature) {
       this.disposeItems();
+      this.disposeSummary();
       this.signature = signature;
     }
 
@@ -41,10 +44,20 @@ export class StatusBarManager {
 
     if (stocks.length === 0) {
       this.disposeItems();
+      this.disposeSummary();
       this.showPlaceholder(alignment, config.statusBarPriority);
       return;
     }
     this.disposePlaceholder();
+
+    const summary = config.showPortfolioSummary
+      ? computePortfolioSummary(quotes, positions)
+      : undefined;
+    if (summary) {
+      this.showSummary(summary, alignment, config);
+    } else {
+      this.disposeSummary();
+    }
 
     const visible = stocks.slice(0, config.maxStatusBarItems);
     visible.forEach((stock, index) => {
@@ -95,6 +108,38 @@ export class StatusBarManager {
   /** 把颜色字符串转换为 VS Code 状态栏可识别的颜色值 */
   private toStatusBarColor(color: string): string | vscode.ThemeColor {
     return color.startsWith('#') ? color : new vscode.ThemeColor(color);
+  }
+
+  /** 展示持仓汇总项，便于用户快速查看全部持仓的当日参考盈亏 */
+  private showSummary(
+    summary: PortfolioSummary,
+    alignment: vscode.StatusBarAlignment,
+    config: StockMonitorConfig
+  ): void {
+    if (!this.summaryItem) {
+      this.summaryItem = vscode.window.createStatusBarItem(alignment, config.statusBarPriority + 1);
+      this.summaryItem.command = { command: 'stockMonitor.refresh', title: '立即刷新行情' };
+      this.summaryItem.name = 'Stock Monitor: portfolioSummary';
+    }
+    const trend = summary.dailyProfit > 0 ? 'up' : summary.dailyProfit < 0 ? 'down' : 'flat';
+    this.summaryItem.text = `${config.portfolioSummaryLabel} ${formatSignedAmount(summary.dailyProfit, config.decimals)}`;
+    this.summaryItem.color = this.toStatusBarColor(
+      colorIdFor(trend, config.colorScheme, config.upColor, config.downColor)
+    );
+
+    const md = new vscode.MarkdownString(undefined, true);
+    md.appendMarkdown('**持仓汇总**\n\n');
+    md.appendMarkdown(`纳入计算：${summary.count} 只  \n`);
+    md.appendMarkdown(`持仓市值：${formatAmount(summary.marketValue, config.decimals)} 元  \n`);
+    md.appendMarkdown(
+      `${config.portfolioSummaryLabel}：${formatSignedAmount(summary.dailyProfit, config.decimals)} 元`
+    );
+    if (summary.totalProfit !== undefined) {
+      md.appendMarkdown(`  \n持仓总收益：${formatSignedAmount(summary.totalProfit, config.decimals)} 元`);
+    }
+    md.appendMarkdown('\n\n点击可立即刷新行情');
+    this.summaryItem.tooltip = md;
+    this.summaryItem.show();
   }
 
   /**
@@ -168,6 +213,11 @@ export class StatusBarManager {
     this.placeholder = undefined;
   }
 
+  private disposeSummary(): void {
+    this.summaryItem?.dispose();
+    this.summaryItem = undefined;
+  }
+
   private disposeItems(): void {
     for (const item of this.items.values()) {
       item.dispose();
@@ -178,5 +228,6 @@ export class StatusBarManager {
   dispose(): void {
     this.disposeItems();
     this.disposePlaceholder();
+    this.disposeSummary();
   }
 }

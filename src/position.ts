@@ -59,6 +59,18 @@ export interface PositionMetrics {
   totalProfitPercent?: number;
 }
 
+/** 持仓汇总指标（针对全部已配置且已获取行情的持仓） */
+export interface PortfolioSummary {
+  /** 已纳入汇总计算的持仓股票数量 */
+  count: number;
+  /** 持仓总市值 */
+  marketValue: number;
+  /** 当日参考盈亏总和 */
+  dailyProfit: number;
+  /** 持仓总收益总和；仅统计配置了成本价的持仓 */
+  totalProfit?: number;
+}
+
 /** 判断是否为有效正数（用于过滤脏配置） */
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -141,4 +153,52 @@ export function computePosition(quote: Quote, setting: PositionSetting): Positio
   }
 
   return metrics;
+}
+
+/**
+ * 汇总全部持仓的整体收益指标。
+ *
+ * 规则说明：
+ * 1. 仅统计“已配置持仓数量且已有实时行情”的股票；
+ * 2. `totalProfit` 只累计配置了成本价的持仓；
+ * 3. 若当前没有任何可计算持仓，则返回 undefined，调用方可直接跳过展示。
+ */
+export function computePortfolioSummary(
+  quotes: Map<string, Quote>,
+  positions: PositionMap
+): PortfolioSummary | undefined {
+  let count = 0;
+  let marketValue = 0;
+  let dailyProfit = 0;
+  let totalProfit = 0;
+  let hasTotalProfit = false;
+
+  for (const [key, setting] of positions) {
+    const quote = quotes.get(key);
+    if (!quote) {
+      continue;
+    }
+    const metrics = computePosition(quote, setting);
+    if (!hasPosition(metrics) || metrics.marketValue === undefined || metrics.dailyProfit === undefined) {
+      continue;
+    }
+    count += 1;
+    marketValue += metrics.marketValue;
+    dailyProfit += metrics.dailyProfit;
+    if (metrics.totalProfit !== undefined) {
+      totalProfit += metrics.totalProfit;
+      hasTotalProfit = true;
+    }
+  }
+
+  if (count === 0) {
+    return undefined;
+  }
+
+  return {
+    count,
+    marketValue,
+    dailyProfit,
+    totalProfit: hasTotalProfit ? totalProfit : undefined,
+  };
 }
