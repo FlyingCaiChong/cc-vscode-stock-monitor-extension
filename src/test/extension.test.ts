@@ -29,6 +29,7 @@ suite('Stock Monitor 扩展冒烟测试', () => {
   test('配置项具备预期默认值', () => {
     const config = vscode.workspace.getConfiguration('stockMonitor');
     assert.strictEqual(config.get('refreshInterval'), 10);
+    assert.strictEqual(config.get('autoRefresh'), true);
     assert.strictEqual(config.get('colorScheme'), 'greenUp');
     assert.strictEqual(config.get('showPortfolioSummary'), true);
     assert.strictEqual(config.get('portfolioSummaryLabel'), '参考盈亏');

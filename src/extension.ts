@@ -337,10 +337,15 @@ class StockMonitorController implements vscode.Disposable {
     void this.refresh("manual");
   }
 
-  /** 重启轮询定时器 */
+  /** 重启轮询定时器；关闭自动刷新时仅清理定时器，不发任何行情请求 */
   private scheduleTimer(): void {
     if (this.timer) {
       clearInterval(this.timer);
+      this.timer = undefined;
+    }
+    if (!this.config.autoRefresh) {
+      logger.info("自动刷新已关闭，停止定时调用行情接口");
+      return;
     }
     this.timer = setInterval(
       () => void this.refresh("timer"),

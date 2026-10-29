@@ -11,7 +11,7 @@
 | 功能 | 说明 |
 | --- | --- |
 | 状态栏实时行情 | 为每只关注股票创建一个状态栏项，持续展示代码 / 名称 / 最新价 / 涨跌幅等核心指标 |
-| 自动轮询刷新 | 默认每 10 秒刷新，可在 5 ~ 300 秒之间配置；网络抖动时自动降级展示上一次成功的行情 |
+| 自动轮询刷新 | 默认每 10 秒刷新，可在 5 ~ 300 秒之间配置；可通过 `stockMonitor.autoRefresh` 关闭定时刷新；网络抖动时自动降级展示上一次成功的行情 |
 | 关注列表管理 | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新 |
 | 收藏置顶 | 收藏的股票在状态栏与列表中优先展示 |
 | **持仓收益** | 可为每只股票配置**别名、成本价、持仓数量**，实时计算**当日收益**与**持仓总收益**（含收益率与持仓市值） |
@@ -180,6 +180,7 @@ npm run compile
 ```jsonc
 {
   "stockMonitor.refreshInterval": 10,
+  "stockMonitor.autoRefresh": true,
   "stockMonitor.statusBarAlignment": "left",
   "stockMonitor.statusBarPriority": 100,
   "stockMonitor.maxStatusBarItems": 6,
@@ -205,6 +206,7 @@ npm run compile
 | 配置项 | 类型 | 默认值 | 取值范围 | 说明 |
 | --- | --- | --- | --- | --- |
 | `stockMonitor.refreshInterval` | number | `10` | 5 ~ 300 | 自动刷新间隔（秒）。过小会加重网络与接口负担 |
+| `stockMonitor.autoRefresh` | boolean | `true` | `true` / `false` | 是否开启定时自动刷新行情。关闭后不再定时调用行情接口，点击状态栏项或执行「立即刷新行情」仍可手动刷新 |
 | `stockMonitor.statusBarAlignment` | string | `left` | `left` / `right` | 状态栏停靠位置 |
 | `stockMonitor.statusBarPriority` | number | `100` | — | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减 |
 | `stockMonitor.maxStatusBarItems` | number | `6` | 1 ~ 20 | 状态栏最多展示的股票数量，收藏项优先 |
