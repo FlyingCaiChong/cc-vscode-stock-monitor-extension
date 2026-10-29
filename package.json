@@ -140,6 +140,7 @@
         },
         "stockMonitor.colorScheme": {
           "type": "string",
+          "order": 100,
           "enum": [
             "greenUp",
             "redUp"
@@ -153,18 +154,21 @@
         },
         "stockMonitor.upColor": {
           "type": "string",
+          "order": 101,
           "default": "",
           "pattern": "^$|^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
           "description": "全局上涨颜色，支持十六进制色值，如 #22c55e。留空则按 colorScheme 方案显示"
         },
         "stockMonitor.downColor": {
           "type": "string",
+          "order": 102,
           "default": "",
           "pattern": "^$|^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
           "description": "全局下跌颜色，支持十六进制色值，如 #ef4444。留空则按 colorScheme 方案显示"
         },
         "stockMonitor.stockColors": {
           "type": "array",
+          "order": 103,
           "default": [],
           "markdownDescription": "单只股票的涨跌颜色覆盖配置。数组元素包含：\n\n- `code`：股票代码，如 `sh600519` / `00700` / `AAPL`\n- `upColor`：该股票上涨颜色，支持十六进制色值\n- `downColor`：该股票下跌颜色，支持十六进制色值\n\n未配置的方向会自动回退到全局 `stockMonitor.upColor` / `stockMonitor.downColor`，若全局也未配置，则继续回退到 `stockMonitor.colorScheme`。",
           "items": {
