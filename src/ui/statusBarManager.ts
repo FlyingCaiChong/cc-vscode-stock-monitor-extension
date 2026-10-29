@@ -3,7 +3,7 @@ import { MARKET_LABEL } from '../market/stockCode';
 import { StockMonitorConfig } from '../config';
 import { computePosition, PositionMap, PositionMetrics } from '../position';
 import { Quote, WatchedStock } from '../types';
-import { colorIdFor, detailRows, formatStatusBarText, positionRows, trendOf } from './format';
+import { colorIdForStock, detailRows, formatStatusBarText, positionRows, trendOf } from './format';
 
 /**
  * 状态栏管理器：为关注列表中的每只股票维护一个 StatusBarItem。
@@ -56,7 +56,16 @@ export class StatusBarManager {
       const displayName = metrics?.alias || stock.name || quote?.name || stock.code;
       if (quote) {
         item.text = formatStatusBarText(quote, config.displayFields, config.decimals, metrics);
-        item.color = new vscode.ThemeColor(colorIdFor(trendOf(quote), config.colorScheme));
+        item.color = this.toStatusBarColor(
+          colorIdForStock(
+            stock.key,
+            trendOf(quote),
+            config.colorScheme,
+            config.upColor,
+            config.downColor,
+            config.stockColors
+          )
+        );
         item.tooltip = this.buildTooltip(quote, stock, metrics, config.decimals);
       } else {
         item.text = `${displayName} --`;
@@ -81,6 +90,11 @@ export class StatusBarManager {
         this.items.delete(key);
       }
     }
+  }
+
+  /** 把颜色字符串转换为 VS Code 状态栏可识别的颜色值 */
+  private toStatusBarColor(color: string): string | vscode.ThemeColor {
+    return color.startsWith('#') ? color : new vscode.ThemeColor(color);
   }
 
   /**

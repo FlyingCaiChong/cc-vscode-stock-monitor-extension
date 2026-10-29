@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import {
+  colorIdForStock,
   colorIdFor,
   detailRows,
   formatNumber,
@@ -61,6 +62,53 @@ suite('format / colorIdFor', () => {
   test('平盘统一为灰色', () => {
     assert.strictEqual(colorIdFor('flat', 'greenUp'), 'descriptionForeground');
     assert.strictEqual(colorIdFor('flat', 'redUp'), 'descriptionForeground');
+  });
+
+  test('全局自定义颜色优先于内置方案', () => {
+    assert.strictEqual(colorIdFor('up', 'greenUp', '#22c55e', '#ef4444'), '#22c55e');
+    assert.strictEqual(colorIdFor('down', 'redUp', '#22c55e', '#ef4444'), '#ef4444');
+  });
+});
+
+suite('format / colorIdForStock', () => {
+  test('单只股票颜色覆盖优先于全局颜色', () => {
+    assert.strictEqual(
+      colorIdForStock(
+        'sz300866',
+        'up',
+        'greenUp',
+        '#22c55e',
+        '#ef4444',
+        [{ key: 'sz300866', upColor: '#a855f7', downColor: '#06b6d4' }]
+      ),
+      '#a855f7'
+    );
+    assert.strictEqual(
+      colorIdForStock(
+        'sz300866',
+        'down',
+        'greenUp',
+        '#22c55e',
+        '#ef4444',
+        [{ key: 'sz300866', upColor: '#a855f7', downColor: '#06b6d4' }]
+      ),
+      '#06b6d4'
+    );
+  });
+
+  test('单只股票未配置的方向回退到全局或内置方案', () => {
+    assert.strictEqual(
+      colorIdForStock(
+        'sz300866',
+        'down',
+        'greenUp',
+        '#22c55e',
+        '#ef4444',
+        [{ key: 'sz300866', upColor: '#a855f7' }]
+      ),
+      '#ef4444'
+    );
+    assert.strictEqual(colorIdForStock('sh600519', 'up', 'redUp', undefined, undefined, []), 'charts.red');
   });
 });
 

@@ -1,4 +1,4 @@
-import { ColorScheme, DisplayField } from '../config';
+import { ColorScheme, DisplayField, StockColorOverride } from '../config';
 import { PositionMetrics } from '../position';
 import { Quote, Trend } from '../types';
 
@@ -19,17 +19,57 @@ export function trendOf(quote: Pick<Quote, 'change' | 'changePercent'>): Trend {
 }
 
 /**
- * 涨跌方向 → 主题色 ID。
- * 使用 VS Code 主题色而非硬编码色值，可自动适配浅色/深色主题。
+ * 涨跌方向 → 颜色值。
+ *
+ * 返回值可能是：
+ * - VS Code 主题色 ID（如 `charts.green`）
+ * - 用户配置的十六进制颜色（如 `#22c55e`）
  */
-export function colorIdFor(trend: Trend, scheme: ColorScheme): string {
+export function colorIdFor(
+  trend: Trend,
+  scheme: ColorScheme,
+  upColor?: string,
+  downColor?: string
+): string {
   if (trend === 'flat') {
     return 'descriptionForeground'; // 灰色
+  }
+  if (trend === 'up' && upColor) {
+    return upColor;
+  }
+  if (trend === 'down' && downColor) {
+    return downColor;
   }
   if (scheme === 'redUp') {
     return trend === 'up' ? 'charts.red' : 'charts.green';
   }
   return trend === 'up' ? 'charts.green' : 'charts.red';
+}
+
+/** 查找单只股票的颜色覆盖配置 */
+export function stockColorOverrideOf(
+  key: string,
+  overrides: StockColorOverride[]
+): StockColorOverride | undefined {
+  return overrides.find((item) => item.key === key);
+}
+
+/** 计算某只股票最终生效的涨跌颜色 */
+export function colorIdForStock(
+  key: string,
+  trend: Trend,
+  scheme: ColorScheme,
+  globalUpColor: string | undefined,
+  globalDownColor: string | undefined,
+  overrides: StockColorOverride[]
+): string {
+  const override = stockColorOverrideOf(key, overrides);
+  return colorIdFor(
+    trend,
+    scheme,
+    override?.upColor ?? globalUpColor,
+    override?.downColor ?? globalDownColor
+  );
 }
 
 /** 固定小数位 */
