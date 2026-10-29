@@ -15,8 +15,9 @@
 | 关注列表管理 | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新 |
 | 收藏置顶 | 收藏的股票在状态栏与列表中优先展示 |
 | **持仓收益** | 可为每只股票配置**别名、成本价、持仓数量**，实时计算**当日收益**与**持仓总收益**（含收益率与持仓市值） |
+| **持仓汇总** | 自动汇总全部持仓的**当日参考盈亏**、**持仓总收益**与**持仓总市值**，并支持开关与文案自定义 |
 | 多市场支持 | A 股（沪 / 深 / 北交所）、港股、美股代码智能识别与归一化 |
-| 涨跌配色 | 上涨 / 下跌 / 平盘三态着色，并提供 `greenUp`（涨绿跌红）与 `redUp`（涨红跌绿）两套方案 |
+| 涨跌配色 | 上涨 / 下跌 / 平盘三态着色，支持 `greenUp` / `redUp` 两套方案、全局自定义颜色，以及单只股票颜色覆盖 |
 | 悬浮明细 | 鼠标悬停即显示行情明细，配置持仓后追加成本价、持仓数量、当日收益与总收益 |
 | 友好错误提示 | 针对代码无效、网络异常、请求超时、接口无数据等场景给出中文提示与排查指引 |
 | 运行日志 | 全部请求与异常写入「Stock Monitor」输出通道，便于自助排查 |
@@ -62,6 +63,7 @@ npm run compile
 
 - **点击**任意状态栏项 → 立即刷新行情。
 - **悬停** → 查看完整明细（涨跌额、今开、昨收、最高、最低、成交量、成交额、行情时间），配置持仓后额外展示成本价、持仓数量、持仓市值、当日收益与持仓总收益。
+- 已配置持仓数量并拿到行情后，会额外显示一个**持仓汇总项**，用于展示全部持仓的当日参考盈亏；可通过 `stockMonitor.showPortfolioSummary` 控制开关，通过 `stockMonitor.portfolioSummaryLabel` 自定义文案。
 - 关注列表为空时，显示占位项 `＋ 添加股票`，点击即可添加。
 
 ### 2. 持仓收益
@@ -113,6 +115,18 @@ npm run compile
 ```
 茅台 1330.75 -1.86% 当日 -2,515.00 总 +13,075.00
 ```
+
+- 若至少有一只股票配置了 `shares` 且已获取行情，状态栏还会额外显示一个**持仓汇总项**，默认文案类似：
+
+```text
+参考盈亏 +1,234.56
+```
+
+- 汇总项悬浮提示会展示：
+  - 纳入计算的持仓数量
+  - 持仓总市值
+  - 当日参考盈亏
+  - 持仓总收益（仅统计配置了成本价的持仓）
 
 > 说明：**只配置 `shares` 才会计算收益**；仅配置 `alias` / `costPrice` 时，别名与成本价照常展示，收益字段自动省略。成本价或数量为非法值（≤ 0、非数字）时会被自动忽略并在运行日志中提示。
 
@@ -169,8 +183,15 @@ npm run compile
   "stockMonitor.statusBarAlignment": "left",
   "stockMonitor.statusBarPriority": 100,
   "stockMonitor.maxStatusBarItems": 6,
+  "stockMonitor.showPortfolioSummary": true,
+  "stockMonitor.portfolioSummaryLabel": "参考盈亏",
   "stockMonitor.displayFields": ["name", "price", "changePercent"],
   "stockMonitor.colorScheme": "greenUp",
+  "stockMonitor.upColor": "#22c55e",
+  "stockMonitor.downColor": "#ef4444",
+  "stockMonitor.stockColors": [
+    { "code": "sz300866", "upColor": "#a855f7", "downColor": "#06b6d4" }
+  ],
   "stockMonitor.decimals": 2,
   "stockMonitor.apiEndpoint": "https://qt.gtimg.cn",
   "stockMonitor.requestTimeout": 5000,
@@ -187,13 +208,18 @@ npm run compile
 | `stockMonitor.statusBarAlignment` | string | `left` | `left` / `right` | 状态栏停靠位置 |
 | `stockMonitor.statusBarPriority` | number | `100` | — | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减 |
 | `stockMonitor.maxStatusBarItems` | number | `6` | 1 ~ 20 | 状态栏最多展示的股票数量，收藏项优先 |
+| `stockMonitor.showPortfolioSummary` | boolean | `true` | `true` / `false` | 是否展示全部持仓的状态栏汇总项 |
+| `stockMonitor.portfolioSummaryLabel` | string | `参考盈亏` | — | 持仓汇总状态栏项的文案前缀，如 `参考盈亏` / `总当日盈亏` |
 | `stockMonitor.displayFields` | array | `["name","price","changePercent"]` | 见下表 | 状态栏展示字段及顺序（仅影响状态栏，悬浮提示始终展示完整明细） |
 | `stockMonitor.colorScheme` | string | `greenUp` | `greenUp` / `redUp` | 涨跌配色方案，平盘统一为灰色 |
+| `stockMonitor.upColor` | string | `""` | 十六进制颜色 | 全局上涨颜色；留空时回退到 `colorScheme` |
+| `stockMonitor.downColor` | string | `""` | 十六进制颜色 | 全局下跌颜色；留空时回退到 `colorScheme` |
+| `stockMonitor.stockColors` | array | `[]` | — | 单只股票颜色覆盖，元素为 `{ code, upColor?, downColor? }` |
 | `stockMonitor.decimals` | number | `2` | 0 ~ 4 | 价格保留小数位数 |
 | `stockMonitor.apiEndpoint` | string | `https://qt.gtimg.cn` | — | 行情接口地址，可替换为自建或第三方代理 |
 | `stockMonitor.requestTimeout` | number | `5000` | 1000 ~ 30000 | 单次请求超时（毫秒） |
-| `stockMonitor.watchList` | array | `["sh000001","sz399001","sh600519"]` | — | **仅首次启动**（尚无本地关注数据时）写入的默认列表 |
-| `stockMonitor.positions` | array | `[]` | — | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`，用于计算收益；可用命令 `stockMonitor.setPosition` 维护 |
+| `stockMonitor.watchList` | array | `["sh000001","sz399001","sh600519"]` | — | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json` |
+| `stockMonitor.positions` | array | `[]` | — | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json` |
 
 `displayFields` 可用字段：
 
@@ -220,6 +246,32 @@ npm run compile
 - `redUp`：上涨 🔴 红色、下跌 🟢 绿色 —— A 股投资者习惯。
 
 平盘两种情况均显示为灰色。配色使用 VS Code 主题色（`charts.green` / `charts.red` / `descriptionForeground`），会自动适配浅色与深色主题。
+
+除此之外，还支持两层自定义颜色：
+
+1. **全局颜色**
+
+```jsonc
+{
+  "stockMonitor.upColor": "#22c55e",
+  "stockMonitor.downColor": "#ef4444"
+}
+```
+
+2. **单只股票覆盖**
+
+```jsonc
+{
+  "stockMonitor.stockColors": [
+    { "code": "sz300866", "upColor": "#a855f7", "downColor": "#06b6d4" },
+    { "code": "sh600519", "upColor": "#f59e0b" }
+  ]
+}
+```
+
+颜色优先级如下：
+
+`单只股票颜色 > 全局颜色 > colorScheme 默认方案`
 
 ---
 
@@ -311,7 +363,13 @@ GET https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL
 3. 检查 `stockMonitor.positions` 中的代码能否被正确识别（参考「股票代码书写格式」）。
 4. 打开 **Stock Monitor: 显示运行日志**，若配置中存在非法条目（数量 ≤ 0、代码无法识别等），日志中会给出具体原因。
 
-### Q8：行情数据是实时的吗？可以用于交易吗？
+### Q8：为什么 `settings.json` 和界面展示不一致？
+
+新版本中，`stockMonitor.watchList` 与 `stockMonitor.positions` 都以 `settings.json` 为主数据源，命令面板和侧边栏中的操作会同步写回配置文件。若你刚升级自旧版本，插件会在启动时把旧缓存自动迁移到 `settings.json`。
+
+若你直接编辑了 `settings.json` 但界面尚未变化，通常重新执行一次 **Developer: Reload Window** 即可。
+
+### Q9：行情数据是实时的吗？可以用于交易吗？
 
 数据来自公开接口，存在秒级延迟，**仅供学习与参考，不构成任何投资建议**，请勿用于程序化交易决策。
 
@@ -354,7 +412,7 @@ src/
 ├── config.ts                 # 配置读取与变更监听
 ├── types.ts                  # 全局类型（不依赖 vscode，便于单测）
 ├── logger.ts                 # OutputChannel 日志封装
-├── watchListStore.ts         # 关注列表持久化（globalState）
+├── watchListStore.ts         # 关注列表存储（settings.json 为主，缓存保留展示元数据）
 ├── position.ts               # 持仓收益计算与配置归一化（纯函数）
 ├── market/
 │   ├── stockCode.ts          # 股票代码识别与归一化（纯函数）
@@ -373,6 +431,7 @@ src/
 - **缓存降级**：`QuoteService` 保留最近一次成功数据；请求失败时降级返回缓存，避免界面闪白。
 - **请求防堆积**：控制器使用 `refreshing` 标记，上一轮未返回时不重复发起请求。
 - **错误去重**：轮询期间的同类错误只写日志不弹窗，避免持续打扰用户。
+- **配置文件为主数据源**：`watchList` / `positions` 以 `settings.json` 为准，用户手动编辑配置后界面会自动同步。
 - **持仓配置容错**：`position.normalizePositions` 逐条校验用户配置，非法条目只记录日志并跳过，不会导致插件异常。
 
 ---
