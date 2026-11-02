@@ -1,5 +1,10 @@
 import * as vscode from 'vscode';
 import { parseStockCode } from './market/stockCode';
+import {
+  DEFAULT_REFRESH_TIME_RANGES,
+  normalizeTimeRanges,
+  RefreshTimeRange,
+} from './timeWindow';
 
 /** 状态栏停靠位置 */
 export type StatusBarAlignment = 'left' | 'right';
@@ -42,6 +47,12 @@ export type DisplayField =
 export interface StockMonitorConfig {
   /** 自动刷新间隔（秒） */
   refreshInterval: number;
+  /** 是否开启定时自动刷新行情 */
+  autoRefresh: boolean;
+  /** 是否启用「仅在指定时间段内自动刷新行情」限制 */
+  enableRefreshTimeRange: boolean;
+  /** 允许自动刷新行情的时间段，为空时视为不限制 */
+  refreshTimeRanges: RefreshTimeRange[];
   /** 状态栏位置 */
   statusBarAlignment: StatusBarAlignment;
   /** 状态栏优先级，数值越大越靠前 */
@@ -141,6 +152,11 @@ export function readConfig(): StockMonitorConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
   return {
     refreshInterval: clamp(cfg.get<number>('refreshInterval', 10), 5, 300),
+    autoRefresh: cfg.get<boolean>('autoRefresh', true),
+    enableRefreshTimeRange: cfg.get<boolean>('enableRefreshTimeRange', true),
+    refreshTimeRanges: normalizeTimeRanges(
+      cfg.get<unknown>('refreshTimeRanges', DEFAULT_REFRESH_TIME_RANGES),
+    ),
     statusBarAlignment: cfg.get<StatusBarAlignment>('statusBarAlignment', 'left'),
     statusBarPriority: cfg.get<number>('statusBarPriority', 100),
     maxStatusBarItems: clamp(cfg.get<number>('maxStatusBarItems', 6), 1, 20),

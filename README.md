@@ -11,7 +11,8 @@
 | 功能 | 说明 |
 | --- | --- |
 | 状态栏实时行情 | 为每只关注股票创建一个状态栏项，持续展示代码 / 名称 / 最新价 / 涨跌幅等核心指标 |
-| 自动轮询刷新 | 默认每 10 秒刷新，可在 5 ~ 300 秒之间配置；网络抖动时自动降级展示上一次成功的行情 |
+| 自动轮询刷新 | 默认每 10 秒刷新，可在 5 ~ 300 秒之间配置；可通过 `stockMonitor.autoRefresh` 关闭定时刷新；网络抖动时自动降级展示上一次成功的行情 |
+| **刷新时段限制** | 可配置仅在指定时间段内自动刷新（默认 `09:00-11:35`、`12:55-15:05`），减少非交易时段的无效请求；可用 `stockMonitor.enableRefreshTimeRange` 关闭限制 |
 | 关注列表管理 | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新 |
 | 收藏置顶 | 收藏的股票在状态栏与列表中优先展示 |
 | **持仓收益** | 可为每只股票配置**别名、成本价、持仓数量**，实时计算**当日收益**与**持仓总收益**（含收益率与持仓市值） |
@@ -180,6 +181,12 @@ npm run compile
 ```jsonc
 {
   "stockMonitor.refreshInterval": 10,
+  "stockMonitor.autoRefresh": true,
+  "stockMonitor.enableRefreshTimeRange": true,
+  "stockMonitor.refreshTimeRanges": [
+    { "start": "09:00", "end": "11:35" },
+    { "start": "12:55", "end": "15:05" }
+  ],
   "stockMonitor.statusBarAlignment": "left",
   "stockMonitor.statusBarPriority": 100,
   "stockMonitor.maxStatusBarItems": 6,
@@ -205,6 +212,9 @@ npm run compile
 | 配置项 | 类型 | 默认值 | 取值范围 | 说明 |
 | --- | --- | --- | --- | --- |
 | `stockMonitor.refreshInterval` | number | `10` | 5 ~ 300 | 自动刷新间隔（秒）。过小会加重网络与接口负担 |
+| `stockMonitor.autoRefresh` | boolean | `true` | `true` / `false` | 是否开启定时自动刷新行情。关闭后不再定时调用行情接口，点击状态栏项或执行「立即刷新行情」仍可手动刷新 |
+| `stockMonitor.enableRefreshTimeRange` | boolean | `true` | `true` / `false` | 是否仅在 `refreshTimeRanges` 指定的时间段内自动刷新；关闭后全天自动刷新。仅约束**定时刷新**，手动刷新不受限 |
+| `stockMonitor.refreshTimeRanges` | array | `[{"start":"09:00","end":"11:35"},{"start":"12:55","end":"15:05"}]` | — | 允许自动刷新的时间段，元素为 `{ start, end }`，24 小时制 `HH:mm`。起止均为闭区间，支持跨零点（如 `22:00-02:00`）；空数组表示不限时段 |
 | `stockMonitor.statusBarAlignment` | string | `left` | `left` / `right` | 状态栏停靠位置 |
 | `stockMonitor.statusBarPriority` | number | `100` | — | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减 |
 | `stockMonitor.maxStatusBarItems` | number | `6` | 1 ~ 20 | 状态栏最多展示的股票数量，收藏项优先 |
@@ -414,6 +424,7 @@ src/
 ├── logger.ts                 # OutputChannel 日志封装
 ├── watchListStore.ts         # 关注列表存储（settings.json 为主，缓存保留展示元数据）
 ├── position.ts               # 持仓收益计算与配置归一化（纯函数）
+├── timeWindow.ts             # 刷新时间段解析与判断（纯函数）
 ├── market/
 │   ├── stockCode.ts          # 股票代码识别与归一化（纯函数）
 │   ├── quoteParser.ts        # 行情报文解析（纯函数）
@@ -427,7 +438,7 @@ src/
 
 ### 架构要点
 
-- **纯函数与副作用分离**：`stockCode` / `quoteParser` / `format` / `position` 四个模块不依赖 `vscode`，可直接用普通 mocha 测试（`npm run test:unit`）。
+- **纯函数与副作用分离**：`stockCode` / `quoteParser` / `format` / `position` / `timeWindow` 等模块不依赖 `vscode`，可直接用普通 mocha 测试（`npm run test:unit`）。
 - **缓存降级**：`QuoteService` 保留最近一次成功数据；请求失败时降级返回缓存，避免界面闪白。
 - **请求防堆积**：控制器使用 `refreshing` 标记，上一轮未返回时不重复发起请求。
 - **错误去重**：轮询期间的同类错误只写日志不弹窗，避免持续打扰用户。
