@@ -9,6 +9,7 @@ import { logger } from "./logger";
 import { QuoteService } from "./market/quoteService";
 import { MARKET_LABEL, parseStockCode } from "./market/stockCode";
 import { normalizePositions, PositionMap } from "./position";
+import { isWithinTimeRanges } from "./timeWindow";
 import {
   Quote,
   QuoteError,
@@ -91,6 +92,9 @@ class StockMonitorController implements vscode.Disposable {
 
   /** 上一次已弹窗提示的错误码，用于抑制轮询期间的重复打扰 */
   private lastNotifiedError: QuoteErrorCode | undefined;
+
+  /** 上一次定时刷新是否因不在时间段内被跳过，用于避免重复日志 */
+  private timerPausedOutsideWindow = false;
 
   /** 启动时是否需要把旧版持仓缓存回填到 settings.json */
   private needsPositionConfigBackfill = false;
@@ -255,6 +259,19 @@ class StockMonitorController implements vscode.Disposable {
     if (this.refreshing) {
       return;
     }
+    // 定时刷新仅在配置的时间段内生效，避免非交易时段无谓地请求行情接口；
+    // 手动刷新与启动刷新不受限制，保证用户随时能主动拉取数据。
+    if (reason === "timer" && !this.isWithinRefreshWindow()) {
+      if (!this.timerPausedOutsideWindow) {
+        this.timerPausedOutsideWindow = true;
+        logger.info("当前不在配置的刷新时间段内，已暂停自动刷新行情");
+      }
+      return;
+    }
+    if (reason === "timer" && this.timerPausedOutsideWindow) {
+      this.timerPausedOutsideWindow = false;
+      logger.info("已进入配置的刷新时间段，恢复自动刷新行情");
+    }
     const stocks = this.store.list();
     if (stocks.length === 0) {
       this.quotes = new Map();
@@ -335,6 +352,14 @@ class StockMonitorController implements vscode.Disposable {
     this.render();
     this.scheduleTimer();
     void this.refresh("manual");
+  }
+
+  /** 判断当前是否处于允许自动刷新的时间段（未启用限制或未配置时间段时恒为 true） */
+  private isWithinRefreshWindow(): boolean {
+    if (!this.config.enableRefreshTimeRange) {
+      return true;
+    }
+    return isWithinTimeRanges(this.config.refreshTimeRanges);
   }
 
   /** 重启轮询定时器；关闭自动刷新时仅清理定时器，不发任何行情请求 */

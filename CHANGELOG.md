@@ -2,6 +2,14 @@
 
 本文件记录 Stock Monitor 插件的所有重要变更，格式参考 [Keep a Changelog](http://keepachangelog.com/)。
 
+## [Unreleased]
+
+### Added
+
+- **刷新时段限制**：新增配置项 `stockMonitor.refreshTimeRanges`，可配置多段允许自动刷新的时间段（默认 `09:00-11:35`、`12:55-15:05`），非交易时段不再发起行情请求；起止时间为闭区间并支持跨零点时段（如 `22:00-02:00`）。
+- 新增开关 `stockMonitor.enableRefreshTimeRange`（默认 `true`）控制时段限制的启用；关闭后全天自动刷新。该限制仅作用于定时刷新，手动刷新（点击状态栏项 / 「立即刷新行情」命令）与启动刷新始终可用。
+- 新增 `src/timeWindow.ts` 纯函数模块及单元测试（时间解析、配置容错归一化、时段判断）。
+
 ## [1.1.0] - 2026-10-29
 
 ### Added
