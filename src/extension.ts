@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { evaluateAlerts } from "./alerts";
 import {
   CONFIG_SECTION,
   onConfigChanged,
@@ -96,6 +97,15 @@ class StockMonitorController implements vscode.Disposable {
   /** 上一次定时刷新是否因不在时间段内被跳过，用于避免重复日志 */
   private timerPausedOutsideWindow = false;
 
+  /** 当前触发预警的股票：key -> 触发原因，用于状态栏高亮与悬浮提示 */
+  private alertHits = new Map<string, string[]>();
+
+  /**
+   * 本轮已提醒过的预警股票。
+   * 条件恢复（如价格回落）后会自动移除，从而重新武装、可再次提醒，避免持续刷屏。
+   */
+  private readonly notifiedAlerts = new Set<string>();
+
   /** 启动时是否需要把旧版持仓缓存回填到 settings.json */
   private needsPositionConfigBackfill = false;
 
@@ -177,8 +187,74 @@ class StockMonitorController implements vscode.Disposable {
       this.quotes,
       this.positions,
       this.config,
+      {
+        alerts: this.alertHits,
+        staleAfterSeconds: this.staleAfterSeconds(),
+      },
     );
     this.treeProvider.refresh();
+  }
+
+  /**
+   * 数据陈旧判定的时间阈值（秒）。
+   *
+   * 仅在「确实应当持续刷新」时才启用，否则会误报：
+   * - 关闭自动刷新时，数据本来就不会更新
+   * - 处于非刷新时段时，本来就暂停了请求
+   * - 阈值为 0 表示用户主动关闭该检测
+   */
+  private staleAfterSeconds(): number | undefined {
+    if (this.config.staleThresholdMultiplier <= 0 || !this.config.autoRefresh) {
+      return undefined;
+    }
+    if (!this.isWithinRefreshWindow()) {
+      return undefined;
+    }
+    return this.config.refreshInterval * this.config.staleThresholdMultiplier;
+  }
+
+  /**
+   * 评估预警规则：刷新状态栏高亮，并对「新触发」的规则弹出提醒。
+   *
+   * 「新触发」的判定配合 `AlertRule.once` 使用：同一条规则在条件持续成立期间只提醒一次，
+   * 条件恢复后自动重新武装。
+   */
+  private evaluateAlertRules(): void {
+    const hits = evaluateAlerts(this.config.alerts, this.quotes);
+    this.alertHits = hits;
+    // 条件恢复的规则重新武装
+    for (const key of [...this.notifiedAlerts]) {
+      if (!hits.has(key)) {
+        this.notifiedAlerts.delete(key);
+      }
+    }
+    if (hits.size === 0) {
+      return;
+    }
+    const rules = new Map(this.config.alerts.map((rule) => [rule.key, rule]));
+    for (const [key, reasons] of hits) {
+      const rule = rules.get(key);
+      if (!rule || (rule.once && this.notifiedAlerts.has(key))) {
+        continue;
+      }
+      this.notifiedAlerts.add(key);
+      this.notifyAlert(key, reasons);
+    }
+  }
+
+  /** 弹出预警提醒（同时写入日志，便于回溯） */
+  private notifyAlert(key: string, reasons: readonly string[]): void {
+    const name =
+      this.positions.get(key)?.alias || this.quotes.get(key)?.name || key;
+    const message = `Stock Monitor 预警：${name} ${reasons.join("；")}`;
+    logger.warn(message);
+    void vscode.window
+      .showWarningMessage(message, "查看日志")
+      .then((choice) => {
+        if (choice === "查看日志") {
+          logger.show();
+        }
+      });
   }
 
   /**
@@ -276,6 +352,8 @@ class StockMonitorController implements vscode.Disposable {
     if (stocks.length === 0) {
       this.quotes = new Map();
       this.service.clear();
+      this.alertHits = new Map();
+      this.notifiedAlerts.clear();
       this.render();
       return;
     }
@@ -293,6 +371,8 @@ class StockMonitorController implements vscode.Disposable {
       for (const quote of quotes.values()) {
         this.store.updateName(quote.key, quote.name);
       }
+      // 先评估预警（更新高亮与弹窗状态），再渲染，保证状态栏与提示同步
+      this.evaluateAlertRules();
       this.render();
       if (error) {
         this.notifyError(error, reason);

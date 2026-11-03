@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AlertRule, normalizeAlerts } from './alerts';
 import { parseStockCode } from './market/stockCode';
 import {
   DEFAULT_REFRESH_TIME_RANGES,
@@ -39,6 +40,12 @@ export type DisplayField =
   | 'prevClose'
   | 'volume'
   | 'turnover'
+  | 'turnoverRate'
+  | 'amplitude'
+  | 'volumeRatio'
+  | 'peTtm'
+  | 'pb'
+  | 'marketCap'
   | 'time'
   | 'profit'
   | 'totalProfit';
@@ -53,6 +60,13 @@ export interface StockMonitorConfig {
   enableRefreshTimeRange: boolean;
   /** 允许自动刷新行情的时间段，为空时视为不限制 */
   refreshTimeRanges: RefreshTimeRange[];
+  /**
+   * 行情数据超过 N 个刷新周期仍未更新时，视为数据陈旧并标记到状态栏。
+   * 取 0 表示不检测。以「刷新周期」为单位可自动适配用户设置的刷新间隔。
+   */
+  staleThresholdMultiplier: number;
+  /** 价格 / 涨跌幅预警规则 */
+  alerts: AlertRule[];
   /** 状态栏位置 */
   statusBarAlignment: StatusBarAlignment;
   /** 状态栏优先级，数值越大越靠前 */
@@ -157,6 +171,8 @@ export function readConfig(): StockMonitorConfig {
     refreshTimeRanges: normalizeTimeRanges(
       cfg.get<unknown>('refreshTimeRanges', DEFAULT_REFRESH_TIME_RANGES),
     ),
+    staleThresholdMultiplier: clamp(cfg.get<number>('staleThresholdMultiplier', 5), 0, 60),
+    alerts: normalizeAlerts(cfg.get<unknown>('alerts', [])).alerts,
     statusBarAlignment: cfg.get<StatusBarAlignment>('statusBarAlignment', 'left'),
     statusBarPriority: cfg.get<number>('statusBarPriority', 100),
     maxStatusBarItems: clamp(cfg.get<number>('maxStatusBarItems', 6), 1, 20),

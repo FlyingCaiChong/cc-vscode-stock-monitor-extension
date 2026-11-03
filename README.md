@@ -4,26 +4,29 @@
 
 > 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.4`
 
-***
+---
 
 ## 功能特性
 
-| 功能         | 说明                                                                                                         |
-| ---------- | ---------------------------------------------------------------------------------------------------------- |
-| 状态栏实时行情    | 为每只关注股票创建一个状态栏项，持续展示代码 / 名称 / 最新价 / 涨跌幅等核心指标                                                               |
-| 自动轮询刷新     | 默认每 10 秒刷新，可在 5 \~ 300 秒之间配置；可通过 `stockMonitor.autoRefresh` 关闭定时刷新；网络抖动时自动降级展示上一次成功的行情                     |
+| 功能             | 说明                                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 状态栏实时行情   | 为每只关注股票创建一个状态栏项，持续展示代码 / 名称 / 最新价 / 涨跌幅等核心指标                                                                    |
+| 自动轮询刷新     | 默认每 10 秒刷新，可在 5 \~ 300 秒之间配置；可通过 `stockMonitor.autoRefresh` 关闭定时刷新；网络抖动时自动降级展示上一次成功的行情                 |
 | **刷新时段限制** | 可配置仅在指定时间段内自动刷新（默认 `09:00-11:35`、`12:55-15:05`），减少非交易时段的无效请求；可用 `stockMonitor.enableRefreshTimeRange` 关闭限制 |
-| 关注列表管理     | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新                                                                          |
-| 收藏置顶       | 收藏的股票在状态栏与列表中优先展示                                                                                          |
-| **持仓收益**   | 可为每只股票配置**别名、成本价、持仓数量**，实时计算**当日收益**与**持仓总收益**（含收益率与持仓市值）                                                  |
-| **持仓汇总**   | 自动汇总全部持仓的**当日参考盈亏**、**持仓总收益**与**持仓总市值**，并支持开关与文案自定义                                                        |
-| 多市场支持      | A 股（沪 / 深 / 北交所）、港股、美股代码智能识别与归一化                                                                           |
-| 涨跌配色       | 上涨 / 下跌 / 平盘三态着色，支持 `greenUp` / `redUp` 两套方案、全局自定义颜色，以及单只股票颜色覆盖                                            |
-| 悬浮明细       | 鼠标悬停即显示行情明细，配置持仓后追加成本价、持仓数量、当日收益与总收益                                                                       |
-| 友好错误提示     | 针对代码无效、网络异常、请求超时、接口无数据等场景给出中文提示与排查指引                                                                       |
-| 运行日志       | 全部请求与异常写入「Stock Monitor」输出通道，便于自助排查                                                                        |
+| **价格预警**     | 为每只股票配置价格上 / 下破、涨跌幅上 / 下破阈值，触发时状态栏高亮 `$(bell)` 并弹窗提醒；支持「只提醒一次，条件恢复后自动重新武装」                |
+| **数据陈旧提示** | 行情超过 `刷新间隔 × 倍数` 未更新（如网络中断）时，状态栏与悬浮提示自动标记 `$(warning)`，及时暴露数据停更                                         |
+| **扩展行情字段** | 除基础行情外，还展示换手率、振幅、量比、市盈率(TTM)、市净率、总市值，并在 A 股涨停 / 跌停时自动追加「涨停」「跌停」标记                            |
+| 关注列表管理     | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新                                                                                 |
+| 收藏置顶         | 收藏的股票在状态栏与列表中优先展示                                                                                                                 |
+| **持仓收益**     | 可为每只股票配置**别名、成本价、持仓数量**，实时计算**当日收益**与**持仓总收益**（含收益率与持仓市值）                                             |
+| **持仓汇总**     | 自动汇总全部持仓的**当日参考盈亏**、**持仓总收益**与**持仓总市值**，并支持开关与文案自定义                                                         |
+| 多市场支持       | A 股（沪 / 深 / 北交所）、港股、美股代码智能识别与归一化                                                                                           |
+| 涨跌配色         | 上涨 / 下跌 / 平盘三态着色，支持 `greenUp` / `redUp` 两套方案、全局自定义颜色，以及单只股票颜色覆盖                                                |
+| 悬浮明细         | 鼠标悬停即显示行情明细，配置持仓后追加成本价、持仓数量、当日收益与总收益                                                                           |
+| 友好错误提示     | 针对代码无效、网络异常、请求超时、接口无数据等场景给出中文提示与排查指引                                                                           |
+| 运行日志         | 全部请求与异常写入「Stock Monitor」输出通道，便于自助排查                                                                                          |
 
-***
+---
 
 ## 安装步骤
 
@@ -44,7 +47,7 @@ npm run compile
 
 在 VS Code 中按 `F5` 启动「Run Extension」配置，会打开一个已加载本插件的开发宿主窗口（详见文末「开发与构建」）。
 
-***
+---
 
 ## 使用方法
 
@@ -60,12 +63,12 @@ npm run compile
 
 为股票配置**别名、成本价、持仓数量**后，插件会在每一轮行情刷新时实时计算收益：
 
-| 指标        | 计算公式                    |
-| --------- | ----------------------- |
-| 持仓市值      | 最新价 × 持仓数量              |
-| **当日收益**  | （最新价 − 昨收）× 持仓数量        |
-| 当日收益率     | 即行情涨跌幅                  |
-| **持仓总收益** | （最新价 − 成本价）× 持仓数量       |
+| 指标           | 计算公式                           |
+| -------------- | ---------------------------------- |
+| 持仓市值       | 最新价 × 持仓数量                  |
+| **当日收益**   | （最新价 − 昨收）× 持仓数量        |
+| 当日收益率     | 即行情涨跌幅                       |
+| **持仓总收益** | （最新价 − 成本价）× 持仓数量      |
 | 持仓收益率     | （最新价 − 成本价）÷ 成本价 × 100% |
 
 配置方式有两种：
@@ -80,9 +83,9 @@ npm run compile
 {
   "stockMonitor.positions": [
     { "code": "sh600519", "alias": "茅台", "costPrice": 1200, "shares": 100 },
-    { "code": "00700",    "alias": "腾讯", "costPrice": 320.5, "shares": 200 },
-    { "code": "AAPL",     "costPrice": 180,   "shares": 30 }
-  ]
+    { "code": "00700", "alias": "腾讯", "costPrice": 320.5, "shares": 200 },
+    { "code": "AAPL", "costPrice": 180, "shares": 30 },
+  ],
 }
 ```
 
@@ -90,7 +93,13 @@ npm run compile
 
 ```jsonc
 {
-  "stockMonitor.displayFields": ["name", "price", "changePercent", "profit", "totalProfit"]
+  "stockMonitor.displayFields": [
+    "name",
+    "price",
+    "changePercent",
+    "profit",
+    "totalProfit",
+  ],
 }
 ```
 
@@ -104,38 +113,66 @@ npm run compile
 
 > 说明：**只配置** **`shares`** **才会计算收益**；仅配置 `alias` / `costPrice` 时，别名与成本价照常展示，收益字段自动省略。成本价或数量为非法值（≤ 0、非数字）时会被自动忽略并在运行日志中提示。
 
-### 3. 股票关注列表（侧边栏）
+### 3. 价格预警
+
+通过 `stockMonitor.alerts` 为关注的股票设置价格 / 涨跌幅阈值，触发后状态栏项会显示 `$(bell)` 图标并在悬浮提示顶部列出触发原因，同时弹出一条警告通知（可点击「查看日志」跳转到输出面板）。
+
+```jsonc
+{
+  "stockMonitor.alerts": [
+    {
+      "code": "sh600519",
+      "above": 1600, // 最新价上破 1600 时提醒
+      "below": 1400, // 最新价下破 1400 时提醒
+      "changePercentAbove": 5, // 涨幅上破 +5% 时提醒
+      "changePercentBelow": -5, // 跌幅下破 -5% 时提醒
+    },
+  ],
+}
+```
+
+- **同一只股票的多个阈值请写在同一个对象内**（写多个对象时只有最后一条生效）。
+- `once`（默认 `true`）表示「未触发 → 触发」的瞬间只提醒一次；当价格回落 / 涨跌幅回到区间内后会自动**重新武装**，下次越界可再次提醒，避免持续刷屏。
+- 触发高亮对**所有越界状态**生效（包括已提醒过的），因此状态栏可始终反映当前是否处于预警区间。
+
+### 4. 数据陈旧提示
+
+行情数据超过 `刷新间隔 × stockMonitor.staleThresholdMultiplier`（默认 5 倍）仍未更新时，状态栏项与悬浮提示会标记 `$(warning)` 并显示距上次更新的秒数，用于发现网络中断等导致的数据停更。
+
+该检测仅在**开启自动刷新且处于刷新时间段内**时生效，避免在非交易时段误报；将 `stockMonitor.staleThresholdMultiplier` 设为 `0` 可完全关闭。
+
+### 5. 股票关注列表（侧边栏）
 
 在「资源管理器（Explorer）」面板中找到 **股票关注列表**：
 
-### 4. 命令列表
+### 6. 命令列表
 
 在命令面板（`Cmd/Ctrl + Shift + P`）输入 `Stock Monitor` 即可看到全部命令：
 
-| 命令                  | 标识                            | 说明                       |
-| ------------------- | ----------------------------- | ------------------------ |
-| 添加股票                | `stockMonitor.addStock`       | 输入代码并校验真实性后加入关注列表        |
-| 移除股票                | `stockMonitor.removeStock`    | 从关注列表删除                  |
-| 收藏 / 取消收藏股票         | `stockMonitor.toggleFavorite` | 切换收藏状态，收藏项优先展示           |
+| 命令                             | 标识                          | 说明                                             |
+| -------------------------------- | ----------------------------- | ------------------------------------------------ |
+| 添加股票                         | `stockMonitor.addStock`       | 输入代码并校验真实性后加入关注列表               |
+| 移除股票                         | `stockMonitor.removeStock`    | 从关注列表删除                                   |
+| 收藏 / 取消收藏股票              | `stockMonitor.toggleFavorite` | 切换收藏状态，收藏项优先展示                     |
 | 设置持仓（别名 / 成本价 / 数量） | `stockMonitor.setPosition`    | 可视化维护持仓配置，用于计算当日收益与持仓总收益 |
-| 立即刷新行情              | `stockMonitor.refresh`        | 手动触发一次刷新                 |
-| 显示运行日志              | `stockMonitor.showLogs`       | 打开输出面板查看请求日志             |
+| 立即刷新行情                     | `stockMonitor.refresh`        | 手动触发一次刷新                                 |
+| 显示运行日志                     | `stockMonitor.showLogs`       | 打开输出面板查看请求日志                         |
 
-### 5. 股票代码书写格式
+### 7. 股票代码书写格式
 
 添加股票时支持以下写法（大小写不敏感，可含空格）：
 
-| 市场       | 支持写法                                                    | 归一化结果      |
-| -------- | ------------------------------------------------------- | ---------- |
-| A 股（沪）   | `600519`、`sh600519`、`600519.SH`、`600519.SS`、`sh.600519` | `sh600519` |
-| A 股（深）   | `000001`、`sz000001`、`000001.SZ`                         | `sz000001` |
-| A 股（北交所） | `830799`、`bj830799`                                     | `bj830799` |
-| 港股       | `700`、`00700`、`hk00700`、`0700.HK`                       | `hk00700`  |
-| 美股       | `AAPL`、`us.AAPL`、`AAPL.OQ`、`NASDAQ:AAPL`                | `usAAPL`   |
+| 市场           | 支持写法                                                    | 归一化结果 |
+| -------------- | ----------------------------------------------------------- | ---------- |
+| A 股（沪）     | `600519`、`sh600519`、`600519.SH`、`600519.SS`、`sh.600519` | `sh600519` |
+| A 股（深）     | `000001`、`sz000001`、`000001.SZ`                           | `sz000001` |
+| A 股（北交所） | `830799`、`bj830799`                                        | `bj830799` |
+| 港股           | `700`、`00700`、`hk00700`、`0700.HK`                        | `hk00700`  |
+| 美股           | `AAPL`、`us.AAPL`、`AAPL.OQ`、`NASDAQ:AAPL`                 | `usAAPL`   |
 
 **规则说明**
 
-***
+---
 
 ## 插件配置
 
@@ -148,7 +185,17 @@ npm run compile
   "stockMonitor.enableRefreshTimeRange": true,
   "stockMonitor.refreshTimeRanges": [
     { "start": "09:00", "end": "11:35" },
-    { "start": "12:55", "end": "15:05" }
+    { "start": "12:55", "end": "15:05" },
+  ],
+  "stockMonitor.staleThresholdMultiplier": 5,
+  "stockMonitor.alerts": [
+    {
+      "code": "sh600519",
+      "above": 1600,
+      "below": 1400,
+      "changePercentAbove": 5,
+      "changePercentBelow": -5,
+    },
   ],
   "stockMonitor.statusBarAlignment": "left",
   "stockMonitor.statusBarPriority": 100,
@@ -160,56 +207,66 @@ npm run compile
   "stockMonitor.upColor": "#22c55e",
   "stockMonitor.downColor": "#ef4444",
   "stockMonitor.stockColors": [
-    { "code": "sz300866", "upColor": "#a855f7", "downColor": "#06b6d4" }
+    { "code": "sz300866", "upColor": "#a855f7", "downColor": "#06b6d4" },
   ],
   "stockMonitor.decimals": 2,
   "stockMonitor.apiEndpoint": "https://qt.gtimg.cn",
   "stockMonitor.requestTimeout": 5000,
   "stockMonitor.watchList": ["sh000001", "sz399001", "sh600519"],
   "stockMonitor.positions": [
-    { "code": "sh600519", "alias": "茅台", "costPrice": 1200, "shares": 100 }
-  ]
+    { "code": "sh600519", "alias": "茅台", "costPrice": 1200, "shares": 100 },
+  ],
 }
 ```
 
-| 配置项                                   | 类型      | 默认值                                                                 | 取值范围                | 说明                                                                                                   |
-| ------------------------------------- | ------- | ------------------------------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `stockMonitor.refreshInterval`        | number  | `10`                                                                | 5 \~ 300            | 自动刷新间隔（秒）。过小会加重网络与接口负担                                                                               |
-| `stockMonitor.autoRefresh`            | boolean | `true`                                                              | `true` / `false`    | 是否开启定时自动刷新行情。关闭后不再定时调用行情接口，点击状态栏项或执行「立即刷新行情」仍可手动刷新                                                   |
-| `stockMonitor.enableRefreshTimeRange` | boolean | `true`                                                              | `true` / `false`    | 是否仅在 `refreshTimeRanges` 指定的时间段内自动刷新；关闭后全天自动刷新。仅约束**定时刷新**，手动刷新不受限                                   |
-| `stockMonitor.refreshTimeRanges`      | array   | `[{"start":"09:00","end":"11:35"},{"start":"12:55","end":"15:05"}]` | —                   | 允许自动刷新的时间段，元素为 `{ start, end }`，24 小时制 `HH:mm`。起止均为闭区间，支持跨零点（如 `22:00-02:00`）；空数组表示不限时段              |
-| `stockMonitor.statusBarAlignment`     | string  | `left`                                                              | `left` / `right`    | 状态栏停靠位置                                                                                              |
-| `stockMonitor.statusBarPriority`      | number  | `100`                                                               | —                   | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减                                                                         |
-| `stockMonitor.maxStatusBarItems`      | number  | `6`                                                                 | 1 \~ 20             | 状态栏最多展示的股票数量，收藏项优先                                                                                   |
-| `stockMonitor.showPortfolioSummary`   | boolean | `true`                                                              | `true` / `false`    | 是否展示全部持仓的状态栏汇总项                                                                                      |
-| `stockMonitor.portfolioSummaryLabel`  | string  | `参考盈亏`                                                              | —                   | 持仓汇总状态栏项的文案前缀，如 `参考盈亏` / `总当日盈亏`                                                                     |
-| `stockMonitor.displayFields`          | array   | `["name","price","changePercent"]`                                  | 见下表                 | 状态栏展示字段及顺序（仅影响状态栏，悬浮提示始终展示完整明细）                                                                      |
-| `stockMonitor.colorScheme`            | string  | `greenUp`                                                           | `greenUp` / `redUp` | 涨跌配色方案，平盘统一为灰色                                                                                       |
-| `stockMonitor.upColor`                | string  | `""`                                                                | 十六进制颜色              | 全局上涨颜色；留空时回退到 `colorScheme`                                                                          |
-| `stockMonitor.downColor`              | string  | `""`                                                                | 十六进制颜色              | 全局下跌颜色；留空时回退到 `colorScheme`                                                                          |
-| `stockMonitor.stockColors`            | array   | `[]`                                                                | —                   | 单只股票颜色覆盖，元素为 `{ code, upColor?, downColor? }`                                                        |
-| `stockMonitor.decimals`               | number  | `2`                                                                 | 0 \~ 4              | 价格保留小数位数                                                                                             |
-| `stockMonitor.apiEndpoint`            | string  | `https://qt.gtimg.cn`                                               | —                   | 行情接口地址，可替换为自建或第三方代理                                                                                  |
-| `stockMonitor.requestTimeout`         | number  | `5000`                                                              | 1000 \~ 30000       | 单次请求超时（毫秒）                                                                                           |
-| `stockMonitor.watchList`              | array   | `["sh000001","sz399001","sh600519"]`                                | —                   | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json`                                                          |
-| `stockMonitor.positions`              | array   | `[]`                                                                | —                   | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json` |
+| 配置项                                  | 类型    | 默认值                                                              | 取值范围            | 说明                                                                                                                                 |
+| --------------------------------------- | ------- | ------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `stockMonitor.refreshInterval`          | number  | `10`                                                                | 5 \~ 300            | 自动刷新间隔（秒）。过小会加重网络与接口负担                                                                                         |
+| `stockMonitor.autoRefresh`              | boolean | `true`                                                              | `true` / `false`    | 是否开启定时自动刷新行情。关闭后不再定时调用行情接口，点击状态栏项或执行「立即刷新行情」仍可手动刷新                                 |
+| `stockMonitor.enableRefreshTimeRange`   | boolean | `true`                                                              | `true` / `false`    | 是否仅在 `refreshTimeRanges` 指定的时间段内自动刷新；关闭后全天自动刷新。仅约束**定时刷新**，手动刷新不受限                          |
+| `stockMonitor.refreshTimeRanges`        | array   | `[{"start":"09:00","end":"11:35"},{"start":"12:55","end":"15:05"}]` | —                   | 允许自动刷新的时间段，元素为 `{ start, end }`，24 小时制 `HH:mm`。起止均为闭区间，支持跨零点（如 `22:00-02:00`）；空数组表示不限时段 |
+| `stockMonitor.staleThresholdMultiplier` | number  | `5`                                                                 | 0 \~ 60             | 行情超过「刷新间隔 × 该倍数」未更新时标记为数据陈旧；`0` 表示不检测。仅在开启自动刷新且处于刷新时段内生效                            |
+| `stockMonitor.alerts`                   | array   | `[]`                                                                | —                   | 价格 / 涨跌幅预警规则，元素为 `{ code, above?, below?, changePercentAbove?, changePercentBelow?, once? }`                            |
+| `stockMonitor.statusBarAlignment`       | string  | `left`                                                              | `left` / `right`    | 状态栏停靠位置                                                                                                                       |
+| `stockMonitor.statusBarPriority`        | number  | `100`                                                               | —                   | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减                                                                             |
+| `stockMonitor.maxStatusBarItems`        | number  | `6`                                                                 | 1 \~ 20             | 状态栏最多展示的股票数量，收藏项优先                                                                                                 |
+| `stockMonitor.showPortfolioSummary`     | boolean | `true`                                                              | `true` / `false`    | 是否展示全部持仓的状态栏汇总项                                                                                                       |
+| `stockMonitor.portfolioSummaryLabel`    | string  | `参考盈亏`                                                          | —                   | 持仓汇总状态栏项的文案前缀，如 `参考盈亏` / `总当日盈亏`                                                                             |
+| `stockMonitor.displayFields`            | array   | `["name","price","changePercent"]`                                  | 见下表              | 状态栏展示字段及顺序（仅影响状态栏，悬浮提示始终展示完整明细）                                                                       |
+| `stockMonitor.colorScheme`              | string  | `greenUp`                                                           | `greenUp` / `redUp` | 涨跌配色方案，平盘统一为灰色                                                                                                         |
+| `stockMonitor.upColor`                  | string  | `""`                                                                | 十六进制颜色        | 全局上涨颜色；留空时回退到 `colorScheme`                                                                                             |
+| `stockMonitor.downColor`                | string  | `""`                                                                | 十六进制颜色        | 全局下跌颜色；留空时回退到 `colorScheme`                                                                                             |
+| `stockMonitor.stockColors`              | array   | `[]`                                                                | —                   | 单只股票颜色覆盖，元素为 `{ code, upColor?, downColor? }`                                                                            |
+| `stockMonitor.decimals`                 | number  | `2`                                                                 | 0 \~ 4              | 价格保留小数位数                                                                                                                     |
+| `stockMonitor.apiEndpoint`              | string  | `https://qt.gtimg.cn`                                               | —                   | 行情接口地址，可替换为自建或第三方代理                                                                                               |
+| `stockMonitor.requestTimeout`           | number  | `5000`                                                              | 1000 \~ 30000       | 单次请求超时（毫秒）                                                                                                                 |
+| `stockMonitor.watchList`                | array   | `["sh000001","sz399001","sh600519"]`                                | —                   | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json`                                                                |
+| `stockMonitor.positions`                | array   | `[]`                                                                | —                   | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json`                 |
 
 `displayFields` 可用字段：
 
-| 字段                   | 含义                                | 状态栏展示效果                   |
-| -------------------- | --------------------------------- | ------------------------- |
-| `name`               | 股票名称（配置别名后展示别名）                   | `贵州茅台` / `茅台`             |
-| `code`               | 股票代码                              | `600519`                  |
-| `price`              | 最新价                               | `1330.75`                 |
-| `change`             | 涨跌额                               | `-25.15`                  |
-| `changePercent`      | 涨跌幅                               | `-1.85%`                  |
-| `profit`             | 当日收益（需配置 `shares`）                | `当日 -2,515.00`            |
-| `totalProfit`        | 持仓总收益（需配置 `shares` 与 `costPrice`） | `总 +13,075.00`            |
-| `high` / `low`       | 最高 / 最低                           | `高 1354.98` / `低 1322.60` |
-| `open` / `prevClose` | 今开 / 昨收                           | `开 1350.00` / `昨 1355.90` |
-| `volume`             | 成交量                               | `388.05万股`                |
-| `turnover`           | 成交额                               | `51.72亿元`                 |
-| `time`               | 行情时间                              | `16:14:54`                |
+| 字段                 | 含义                                         | 状态栏展示效果              |
+| -------------------- | -------------------------------------------- | --------------------------- |
+| `name`               | 股票名称（配置别名后展示别名）               | `贵州茅台` / `茅台`         |
+| `code`               | 股票代码                                     | `600519`                    |
+| `price`              | 最新价                                       | `1330.75`                   |
+| `change`             | 涨跌额                                       | `-25.15`                    |
+| `changePercent`      | 涨跌幅                                       | `-1.85%`                    |
+| `profit`             | 当日收益（需配置 `shares`）                  | `当日 -2,515.00`            |
+| `totalProfit`        | 持仓总收益（需配置 `shares` 与 `costPrice`） | `总 +13,075.00`             |
+| `high` / `low`       | 最高 / 最低                                  | `高 1354.98` / `低 1322.60` |
+| `open` / `prevClose` | 今开 / 昨收                                  | `开 1350.00` / `昨 1355.90` |
+| `volume`             | 成交量                                       | `388.05万股`                |
+| `turnover`           | 成交额                                       | `51.72亿元`                 |
+| `turnoverRate`       | 换手率（港股不提供，自动省略）               | `换手 0.59%`                |
+| `amplitude`          | 振幅                                         | `振幅 3.20%`                |
+| `volumeRatio`        | 量比（仅 A 股提供，自动省略）                | `量比 1.35`                 |
+| `peTtm`              | 市盈率(TTM)                                  | `PE 28.60`                  |
+| `pb`                 | 市净率（仅 A 股提供，自动省略）              | `PB 8.10`                   |
+| `marketCap`          | 总市值                                       | `市值 120.00亿元`           |
+| `time`               | 行情时间                                     | `16:14:54`                  |
+
+> 说明：扩展统计字段（`turnoverRate` / `amplitude` / `volumeRatio` / `peTtm` / `pb` / `marketCap`）在接口未提供数据时自动省略，不会展示无意义的 `0`。此外，A 股触及涨 / 跌停时，状态栏文本末尾会自动追加「涨停」/「跌停」，无需额外配置。
 
 ### 涨跌配色说明
 
@@ -222,7 +279,7 @@ npm run compile
 ```jsonc
 {
   "stockMonitor.upColor": "#22c55e",
-  "stockMonitor.downColor": "#ef4444"
+  "stockMonitor.downColor": "#ef4444",
 }
 ```
 
@@ -230,8 +287,8 @@ npm run compile
 {
   "stockMonitor.stockColors": [
     { "code": "sz300866", "upColor": "#a855f7", "downColor": "#06b6d4" },
-    { "code": "sh600519", "upColor": "#f59e0b" }
-  ]
+    { "code": "sh600519", "upColor": "#f59e0b" },
+  ],
 }
 ```
 
@@ -239,7 +296,7 @@ npm run compile
 
 `单只股票颜色 > 全局颜色 > colorScheme 默认方案`
 
-***
+---
 
 ## 行情 API 说明
 
@@ -253,19 +310,24 @@ GET https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL
 
 ### 请求要点
 
-### 响应字段（`~` 分隔，各市场下标一致）
+### 响应字段（`~` 分隔）
 
-| 下标 | 含义  | 下标 | 含义     |
-| -- | --- | -- | ------ |
-| 1  | 名称  | 30 | 行情时间   |
-| 2  | 代码  | 31 | 涨跌额    |
-| 3  | 最新价 | 32 | 涨跌幅（%） |
-| 4  | 昨收  | 33 | 最高     |
-| 5  | 今开  | 34 | 最低     |
-| —  | —   | 36 | 成交量    |
-| —  | —   | 37 | 成交额    |
+| 下标 | 含义         | 下标 | 含义         |
+| ---- | ------------ | ---- | ------------ |
+| 1    | 名称         | 30   | 行情时间     |
+| 2    | 代码         | 31   | 涨跌额       |
+| 3    | 最新价       | 32   | 涨跌幅（%）  |
+| 4    | 昨收         | 33   | 最高         |
+| 5    | 今开         | 34   | 最低         |
+| 38   | 换手率（%）※ | 36   | 成交量       |
+| 39   | 市盈率(TTM)  | 37   | 成交额       |
+| 43   | 振幅（%）    | 45   | 总市值（亿） |
+| 46   | 市净率 ※     | 47   | 涨停价 ※     |
+| 48   | 跌停价 ※     | 49   | 量比 ※       |
 
-**单位换算**：A 股成交量原始单位为「手」（×100 得股数）、成交额为「万元」（×10000 得元）；港股与美股已分别是「股」与「元」，无需换算。插件内部统一换算为「股 / 元」后再格式化展示。
+> 标记 ※ 的字段（下标 46 ~ 49）**仅 A 股有效**：港美股在相同位置存放的是英文名与 52 周最高 / 最低价，含义完全不同，插件会按市场门控，避免误读。港股不提供换手率，恒为 0。
+
+**单位换算**：A 股成交量原始单位为「手」（×100 得股数）、成交额为「万元」（×10000 得元），总市值原始单位为「亿元」（×1e8 得元）；港股与美股成交量 / 成交额已分别是「股」与「元」，无需换算。插件内部统一换算为「股 / 元」后再格式化展示。
 
 **时间格式**：A 股为 `20261028161454`（紧凑 14 位），港美股为 `2026/10/28 16:08:30` 或 `2026-10-28 16:00:01`，插件统一归一化为 `HH:mm:ss`。
 
@@ -273,7 +335,7 @@ GET https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL
 
 若默认地址不可用（如内网限制、接口变更），可配置 `stockMonitor.apiEndpoint` 指向自建反向代理。要求代理：
 
-***
+---
 
 ## 常见问题排查（FAQ）
 
@@ -305,7 +367,7 @@ GET https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL
 
 数据来自公开接口，存在秒级延迟，**仅供学习与参考，不构成任何投资建议**，请勿用于程序化交易决策。
 
-***
+---
 
 ## 开发与构建
 
@@ -346,6 +408,7 @@ src/
 ├── logger.ts                 # OutputChannel 日志封装
 ├── watchListStore.ts         # 关注列表存储（settings.json 为主，缓存保留展示元数据）
 ├── position.ts               # 持仓收益计算与配置归一化（纯函数）
+├── alerts.ts                 # 价格 / 涨跌幅预警规则解析与判定（纯函数）
 ├── timeWindow.ts             # 刷新时间段解析与判断（纯函数）
 ├── market/
 │   ├── stockCode.ts          # 股票代码识别与归一化（纯函数）
@@ -360,20 +423,20 @@ src/
 
 ### 架构要点
 
-***
+---
 
 ## 性能开销说明
 
-***
+---
 
 ## 已知限制
 
-***
+---
 
 ## 免责声明
 
 本插件仅用于学习与技术演示。所有行情数据均来自第三方公开接口，其准确性、完整性与及时性不作任何保证。**本插件不构成任何投资建议，使用者据此进行投资决策所产生的风险与损失由使用者自行承担。**
 
-***
+---
 
 ## 相关链接

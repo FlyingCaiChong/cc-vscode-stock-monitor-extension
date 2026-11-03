@@ -9,6 +9,9 @@
 - **刷新时段限制**：新增配置项 `stockMonitor.refreshTimeRanges`，可配置多段允许自动刷新的时间段（默认 `09:00-11:35`、`12:55-15:05`），非交易时段不再发起行情请求；起止时间为闭区间并支持跨零点时段（如 `22:00-02:00`）。
 - 新增开关 `stockMonitor.enableRefreshTimeRange`（默认 `true`）控制时段限制的启用；关闭后全天自动刷新。该限制仅作用于定时刷新，手动刷新（点击状态栏项 / 「立即刷新行情」命令）与启动刷新始终可用。
 - 新增 `src/timeWindow.ts` 纯函数模块及单元测试（时间解析、配置容错归一化、时段判断）。
+- **价格预警**：新增配置项 `stockMonitor.alerts`，支持为每只股票配置 `above` / `below`（价格上 / 下破）与 `changePercentAbove` / `changePercentBelow`（涨跌幅上 / 下破）阈值。触发后状态栏显示 `$(bell)` 高亮并弹窗提醒，悬浮提示顶部列出触发原因；`once`（默认 `true`）保证「未触发 → 触发」只提醒一次，条件恢复后自动重新武装。新增 `src/alerts.ts` 纯函数模块及单元测试。
+- **数据陈旧提示**：新增配置项 `stockMonitor.staleThresholdMultiplier`（默认 `5`，`0` 表示关闭），行情超过「刷新间隔 × 倍数」未更新时，状态栏与悬浮提示自动标记 `$(warning)` 并显示停更秒数。仅在开启自动刷新且处于刷新时段内生效。
+- **扩展行情字段**：`Quote` 新增换手率 / 振幅 / 量比 / 市盈率(TTM) / 市净率 / 总市值 / 涨停价 / 跌停价，并在 `displayFields` 中新增对应字段（无数据时自动省略）；A 股触及涨 / 跌停时状态栏文本末尾自动追加「涨停」/「跌停」标记。
 - 新增插件图标 `images/stock_icon.png`（128×128 PNG），并通过 `package.json` 的 `icon` 字段在扩展列表与 Marketplace 中展示。
 - 新增 `LICENSE.md`（MIT 协议），满足 Marketplace 发布时的许可证展示要求。
 

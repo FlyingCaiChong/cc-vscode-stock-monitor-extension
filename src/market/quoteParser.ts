@@ -13,6 +13,16 @@ import { MarketId, Quote, StockCode } from '../types';
  *   1 名称 | 2 代码 | 3 最新价 | 4 昨收 | 5 今开
  *   30 行情时间 | 31 涨跌额 | 32 涨跌幅 | 33 最高 | 34 最低
  *   36 成交量  | 37 成交额
+ *
+ * 扩展统计字段（下标经真实接口实测确认）：
+ *   38 换手率(%)  仅 A 股 / 美股有效，港股恒为 0
+ *   39 市盈率(TTM) 各市场均有效
+ *   43 振幅(%)    各市场均有效
+ *   45 总市值(亿)  各市场均有效
+ *   46 市净率      仅 A 股有效（港美股该位置是英文名，如 TENCENT / Apple Inc.）
+ *   47 涨停价      仅 A 股有效（港美股该位置是 52 周最高价）
+ *   48 跌停价      仅 A 股有效（港美股该位置是 52 周最低价）
+ *   49 量比        仅 A 股有效（港美股该位置是其它含义的数值）
  */
 
 /** 安全地把字符串转为数字，非法值返回 0 */
@@ -72,6 +82,17 @@ export function parseQuoteLine(key: string, payload: string, expected: StockCode
   const volume = toNumber(fields[36]) * (isCn ? 100 : 1);
   const turnover = toNumber(fields[37]) * (isCn ? 10000 : 1);
 
+  // 扩展统计字段：港美股在 46 ~ 49 位置存放的是其它含义的数据，
+  // 因此这几项必须按市场门控，否则会把「英文名 / 52 周高低价」误读成市净率或涨跌停价。
+  const turnoverRate = toNumber(fields[38]);
+  const peTtm = toNumber(fields[39]);
+  const amplitude = toNumber(fields[43]);
+  const marketCap = toNumber(fields[45]) * 1e8; // 接口单位为「亿」，统一换算为「元」
+  const pb = isCn ? toNumber(fields[46]) : 0;
+  const limitUp = isCn ? toNumber(fields[47]) : 0;
+  const limitDown = isCn ? toNumber(fields[48]) : 0;
+  const volumeRatio = isCn ? toNumber(fields[49]) : 0;
+
   return {
     key: expected?.key ?? key,
     code: expected?.code ?? fields[2] ?? key,
@@ -86,6 +107,14 @@ export function parseQuoteLine(key: string, payload: string, expected: StockCode
     changePercent,
     volume,
     turnover,
+    turnoverRate,
+    amplitude,
+    volumeRatio,
+    peTtm,
+    pb,
+    marketCap,
+    limitUp,
+    limitDown,
     time: normalizeQuoteTime(fields[30] ?? ''),
     fetchedAt: Date.now(),
   };

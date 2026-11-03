@@ -8,6 +8,8 @@ import {
   formatStatusBarText,
   formatTurnover,
   formatVolume,
+  limitLabelOf,
+  limitStatusOf,
   trendOf,
 } from '../../ui/format';
 import { Quote } from '../../types';
@@ -28,6 +30,15 @@ function makeQuote(overrides: Partial<Quote> = {}): Quote {
     changePercent: -1.86,
     volume: 4567800,
     turnover: 6123450000,
+    // 扩展统计字段默认取 0，表示「接口未提供」，格式化时应自动省略
+    turnoverRate: 0,
+    amplitude: 0,
+    volumeRatio: 0,
+    peTtm: 0,
+    pb: 0,
+    marketCap: 0,
+    limitUp: 0,
+    limitDown: 0,
     time: '16:14:54',
     fetchedAt: 0,
     ...overrides,
@@ -185,5 +196,75 @@ suite('format / 状态栏与明细', () => {
   test('detailRows 对缺失时间显示占位符', () => {
     const rows = detailRows(makeQuote({ time: '' }), 2);
     assert.deepStrictEqual(rows[9], ['行情时间', '--']);
+  });
+});
+
+suite('format / 涨跌停判定', () => {
+  test('最新价触及涨停 / 跌停价时返回对应方向', () => {
+    assert.strictEqual(limitStatusOf({ price: 100, limitUp: 100, limitDown: 90 }), 'up');
+    assert.strictEqual(limitStatusOf({ price: 90, limitUp: 100, limitDown: 90 }), 'down');
+    // 允许半分容差：价格略低于涨停价仍视为涨停
+    assert.strictEqual(limitStatusOf({ price: 99.999, limitUp: 100, limitDown: 90 }), 'up');
+    // 价格位于涨跌停区间中间时无状态
+    assert.strictEqual(limitStatusOf({ price: 95, limitUp: 100, limitDown: 90 }), undefined);
+  });
+
+  test('未提供涨跌停价（港美股）时恒为无状态', () => {
+    assert.strictEqual(limitStatusOf({ price: 100, limitUp: 0, limitDown: 0 }), undefined);
+    assert.strictEqual(limitLabelOf({ price: 100, limitUp: 0, limitDown: 0 }), '');
+  });
+
+  test('limitLabelOf 返回中文标记', () => {
+    assert.strictEqual(limitLabelOf({ price: 100, limitUp: 100, limitDown: 90 }), '涨停');
+    assert.strictEqual(limitLabelOf({ price: 90, limitUp: 100, limitDown: 90 }), '跌停');
+    assert.strictEqual(limitLabelOf({ price: 95, limitUp: 100, limitDown: 90 }), '');
+  });
+});
+
+suite('format / 扩展统计字段', () => {
+  test('状态栏仅在字段有效（> 0）时展示，并自动追加涨跌停标记', () => {
+    const quote = makeQuote({
+      turnoverRate: 0.59,
+      amplitude: 3.2,
+      volumeRatio: 1.35,
+      peTtm: 28.6,
+      pb: 8.1,
+      marketCap: 1.2e10,
+    });
+    assert.strictEqual(formatStatusBarText(quote, ['turnoverRate'], 2), '换手 0.59%');
+    assert.strictEqual(formatStatusBarText(quote, ['peTtm', 'pb'], 2), 'PE 28.60 PB 8.10');
+    // 总市值复用成交额格式化，统一换算为「亿元 / 万元 / 元」
+    assert.strictEqual(formatStatusBarText(quote, ['marketCap'], 2), '市值 120.00亿元');
+    // 默认 makeQuote 的扩展字段为 0，应被自动省略
+    assert.strictEqual(formatStatusBarText(makeQuote(), ['turnoverRate', 'peTtm'], 2), '');
+  });
+
+  test('状态栏自动追加涨停标记', () => {
+    const quote = makeQuote({ price: 100, limitUp: 100, limitDown: 90, changePercent: 10 });
+    assert.strictEqual(
+      formatStatusBarText(quote, ['name', 'price'], 2),
+      '贵州茅台 100.00 涨停'
+    );
+  });
+
+  test('detailRows 在拿到扩展字段时追加对应明细行', () => {
+    const rows = detailRows(
+      makeQuote({
+        turnoverRate: 0.59,
+        volumeRatio: 1.35,
+        pb: 8.1,
+        limitUp: 1461.49,
+        limitDown: 1195.31,
+      }),
+      2
+    );
+    const asMap = new Map(rows);
+    assert.strictEqual(asMap.get('换手率'), '0.59%');
+    assert.strictEqual(asMap.get('量比'), '1.35');
+    assert.strictEqual(asMap.get('市净率'), '8.10');
+    assert.strictEqual(asMap.get('涨停价'), '1461.49');
+    assert.strictEqual(asMap.get('跌停价'), '1195.31');
+    // 最后一行始终是行情时间
+    assert.deepStrictEqual(rows[rows.length - 1], ['行情时间', '16:14:54']);
   });
 });

@@ -2,7 +2,7 @@
   "name": "vscode-stock-monitor-extension",
   "displayName": "Stock Monitor",
   "description": "在 VS Code 状态栏实时监控 A股 / 港股 / 美股行情，支持自选列表、收藏、持仓收益与涨跌配色",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "publisher": "FlyingCaiChong",
   "license": "MIT",
   "icon": "images/stock_icon.png",
@@ -71,6 +71,7 @@
       "properties": {
         "stockMonitor.refreshInterval": {
           "type": "number",
+          "order": 1,
           "default": 10,
           "minimum": 5,
           "maximum": 300,
@@ -78,16 +79,19 @@
         },
         "stockMonitor.autoRefresh": {
           "type": "boolean",
+          "order": 2,
           "default": true,
           "markdownDescription": "是否开启定时自动刷新行情。关闭后不再定时调用行情接口，但仍可点击状态栏项或执行「立即刷新行情」命令手动获取行情。默认 `true`。"
         },
         "stockMonitor.enableRefreshTimeRange": {
           "type": "boolean",
+          "order": 3,
           "default": true,
           "markdownDescription": "是否仅在 `stockMonitor.refreshTimeRanges` 指定的时间段内自动刷新行情。关闭后全天自动刷新。默认 `true`。\n\n注意：仅约束**定时自动刷新**，点击状态栏项或执行「立即刷新行情」命令的手动刷新不受限制。"
         },
         "stockMonitor.refreshTimeRanges": {
           "type": "array",
+          "order": 4,
           "default": [
             {
               "start": "09:00",
@@ -127,6 +131,64 @@
               {
                 "start": "12:55",
                 "end": "15:05"
+              }
+            ]
+          ]
+        },
+        "stockMonitor.staleThresholdMultiplier": {
+          "type": "number",
+          "order": 5,
+          "default": 5,
+          "minimum": 0,
+          "maximum": 60,
+          "markdownDescription": "行情数据超过「刷新间隔 × 该倍数」仍未更新时，在状态栏标记为数据陈旧（显示 `$(warning)` 图标）。取 `0` 表示不检测。默认 `5`，即 5 个刷新周期（默认刷新间隔下约 50 秒）。\n\n注意：仅在开启自动刷新且处于刷新时间段内时生效，避免在非交易时段误报。"
+        },
+        "stockMonitor.alerts": {
+          "type": "array",
+          "order": 6,
+          "default": [],
+          "markdownDescription": "价格 / 涨跌幅预警规则。数组元素包含：\n\n- `code`：股票代码，格式同关注列表（如 `sh600519` / `00700` / `AAPL`）\n- `above`：最新价上破该值时提醒\n- `below`：最新价下破该值时提醒\n- `changePercentAbove`：涨跌幅上破该百分比时提醒，如 `5` 表示 +5%\n- `changePercentBelow`：涨跌幅下破该百分比时提醒，如 `-5` 表示 -5%\n- `once`：是否只在首次触发时提醒一次，默认 `true`；条件恢复（如价格回落）后会自动重新武装，可再次提醒\n\n同一只股票的多条阈值请写在同一个对象内。触发后状态栏会显示 `$(bell)` 图标，并在悬浮提示中列出触发原因。",
+          "items": {
+            "type": "object",
+            "required": [
+              "code"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "股票代码，如 sh600519 / 00700 / AAPL"
+              },
+              "above": {
+                "type": "number",
+                "description": "最新价上破该值时提醒，需大于 0"
+              },
+              "below": {
+                "type": "number",
+                "description": "最新价下破该值时提醒，需大于 0"
+              },
+              "changePercentAbove": {
+                "type": "number",
+                "description": "涨跌幅上破该百分比时提醒，如 5 表示 +5%"
+              },
+              "changePercentBelow": {
+                "type": "number",
+                "description": "涨跌幅下破该百分比时提醒，如 -5 表示 -5%"
+              },
+              "once": {
+                "type": "boolean",
+                "default": true,
+                "description": "是否只在首次触发时提醒一次，条件恢复后自动重新武装"
+              }
+            }
+          },
+          "examples": [
+            [
+              {
+                "code": "sh600519",
+                "above": 1600,
+                "below": 1400,
+                "changePercentAbove": 5,
+                "changePercentBelow": -5
               }
             ]
           ]
@@ -182,6 +244,12 @@
               "prevClose",
               "volume",
               "turnover",
+              "turnoverRate",
+              "amplitude",
+              "volumeRatio",
+              "peTtm",
+              "pb",
+              "marketCap",
               "time",
               "profit",
               "totalProfit"
@@ -192,7 +260,7 @@
             "price",
             "changePercent"
           ],
-          "description": "状态栏展示字段及顺序。name=名称，price=最新价，change=涨跌额，changePercent=涨跌幅，profit=当日收益，totalProfit=持仓总收益，其余为最高/最低/今开/昨收/成交量/成交额/行情时间。收益类字段需在 stockMonitor.positions 中配置持仓数量"
+          "description": "状态栏展示字段及顺序。name=名称，price=最新价，change=涨跌额，changePercent=涨跌幅，turnoverRate=换手率，amplitude=振幅，volumeRatio=量比，peTtm=市盈率(TTM)，pb=市净率，marketCap=总市值，profit=当日收益，totalProfit=持仓总收益，其余为最高/最低/今开/昨收/成交量/成交额/行情时间。扩展统计字段在接口未提供数据时自动省略；收益类字段需在 stockMonitor.positions 中配置持仓数量"
         },
         "stockMonitor.colorScheme": {
           "type": "string",

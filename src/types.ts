@@ -45,6 +45,25 @@ export interface Quote {
   volume: number;
   /** 成交额，统一换算为「元」 */
   turnover: number;
+  /**
+   * 换手率（百分数值，0.59 表示 0.59%）。
+   * 注意：港股接口不提供该字段，恒为 0，展示时需按 0 视为无数据。
+   */
+  turnoverRate: number;
+  /** 振幅（百分数值）。各市场均提供；无数据时为 0 */
+  amplitude: number;
+  /** 量比。仅 A 股提供，其它市场恒为 0 */
+  volumeRatio: number;
+  /** 市盈率（TTM）。各市场均提供；无数据时为 0 */
+  peTtm: number;
+  /** 市净率。仅 A 股提供，其它市场恒为 0 */
+  pb: number;
+  /** 总市值，统一换算为「元」（接口原始单位为「亿」）；无数据时为 0 */
+  marketCap: number;
+  /** 涨停价。仅 A 股提供，其它市场恒为 0 */
+  limitUp: number;
+  /** 跌停价。仅 A 股提供，其它市场恒为 0 */
+  limitDown: number;
   /** 行情时间，统一为 HH:mm:ss；无法解析时为空串 */
   time: string;
   /** 本地拉取时间戳（毫秒） */
