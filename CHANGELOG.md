@@ -10,6 +10,7 @@
 - 新增开关 `stockMonitor.enableRefreshTimeRange`（默认 `true`）控制时段限制的启用；关闭后全天自动刷新。该限制仅作用于定时刷新，手动刷新（点击状态栏项 / 「立即刷新行情」命令）与启动刷新始终可用。
 - 新增 `src/timeWindow.ts` 纯函数模块及单元测试（时间解析、配置容错归一化、时段判断）。
 - 新增插件图标 `images/stock_icon.png`（128×128 PNG），并通过 `package.json` 的 `icon` 字段在扩展列表与 Marketplace 中展示。
+- 新增 `LICENSE.md`（MIT 协议），满足 Marketplace 发布时的许可证展示要求。
 
 ## [1.1.0] - 2026-10-29
 
