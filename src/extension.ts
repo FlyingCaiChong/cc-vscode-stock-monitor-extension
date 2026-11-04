@@ -7,6 +7,7 @@ import {
   StockMonitorConfig,
 } from "./config";
 import { logger } from "./logger";
+import { fetchChartData } from "./market/chartProvider";
 import { QuoteService } from "./market/quoteService";
 import { MARKET_LABEL, parseStockCode } from "./market/stockCode";
 import { normalizePositions, PositionMap } from "./position";
@@ -19,6 +20,7 @@ import {
   WatchedStock,
 } from "./types";
 import { StatusBarManager } from "./ui/statusBarManager";
+import { ChartPanel } from "./ui/chartPanel";
 import { WatchListProvider, WatchListNode } from "./ui/watchListView";
 import { WatchListStore } from "./watchListStore";
 
@@ -71,6 +73,8 @@ class StockMonitorController implements vscode.Disposable {
 
   private readonly treeProvider: WatchListProvider;
 
+  private readonly chartPanel: ChartPanel;
+
   private readonly disposables: vscode.Disposable[] = [];
 
   /** 最近一次成功获取的行情快照 */
@@ -113,6 +117,9 @@ class StockMonitorController implements vscode.Disposable {
     this.config = readConfig();
     this.store = new WatchListStore(context, this.config.initialWatchList);
     this.statusBar = new StatusBarManager("stockMonitor.addStock");
+    this.chartPanel = new ChartPanel(context.extensionUri, (stock, period) =>
+      fetchChartData(stock, period, this.config),
+    );
     this.treeProvider = new WatchListProvider(
       () => this.store.list(),
       (key) => this.quotes.get(key),
@@ -139,6 +146,10 @@ class StockMonitorController implements vscode.Disposable {
       vscode.commands.registerCommand(
         "stockMonitor.setPosition",
         (node?: unknown) => this.setPosition(node),
+      ),
+      vscode.commands.registerCommand(
+        "stockMonitor.openChart",
+        (node?: unknown) => this.openChart(node),
       ),
       vscode.commands.registerCommand("stockMonitor.refresh", () =>
         this.refresh("manual"),
@@ -374,6 +385,7 @@ class StockMonitorController implements vscode.Disposable {
       // 先评估预警（更新高亮与弹窗状态），再渲染，保证状态栏与提示同步
       this.evaluateAlertRules();
       this.render();
+      await this.chartPanel.refreshVisible();
       if (error) {
         this.notifyError(error, reason);
       } else {
@@ -676,6 +688,31 @@ class StockMonitorController implements vscode.Disposable {
     return this.positions.get(stock.key)?.alias || stock.name || stock.code;
   }
 
+  /**
+   * 打开图表面板。
+   *
+   * 支持两种入口：
+   * 1. 树视图点击 / 右键菜单传入具体股票
+   * 2. 命令面板无参执行时，先弹出 QuickPick 让用户选择
+   */
+  private async openChart(node?: unknown): Promise<void> {
+    const target =
+      toWatchedStock(node) ??
+      (await this.pickStock("查看图表", "选择要查看图表的股票"));
+    if (!target) {
+      return;
+    }
+    try {
+      const displayName = this.displayNameOf(target);
+      this.chartPanel.show(target, displayName);
+    } catch (err) {
+      logger.error("打开图表面板失败", err);
+      void vscode.window.showErrorMessage(
+        `Stock Monitor：打开图表面板失败：${err instanceof Error ? err.message : "未知错误"}`,
+      );
+    }
+  }
+
   /** 数字输入校验：留空合法，否则必须为大于 0 的数字 */
   private positiveNumberValidator(
     label: string,
@@ -734,6 +771,7 @@ class StockMonitorController implements vscode.Disposable {
       disposable.dispose();
     }
     this.statusBar.dispose();
+    this.chartPanel.dispose();
     this.treeProvider.dispose();
     this.store.dispose();
     logger.dispose();

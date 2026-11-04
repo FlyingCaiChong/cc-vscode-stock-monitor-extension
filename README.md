@@ -2,7 +2,7 @@
 
 在 VS Code **状态栏**与**资源管理器侧边栏**中实时监控 A 股 / 港股 / 美股行情。灵感来自 Stock Bar，支持自选股管理、收藏置顶、持仓收益、涨跌配色与丰富的自定义配置。
 
-> 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.4`
+> 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.6`
 
 ---
 
@@ -15,6 +15,7 @@
 | **刷新时段限制** | 可配置仅在指定时间段内自动刷新（默认 `09:00-11:35`、`12:55-15:05`），减少非交易时段的无效请求；可用 `stockMonitor.enableRefreshTimeRange` 关闭限制 |
 | **价格预警**     | 为每只股票配置价格上 / 下破、涨跌幅上 / 下破阈值，触发时状态栏高亮 `$(bell)` 并弹窗提醒；支持「只提醒一次，条件恢复后自动重新武装」                |
 | **数据陈旧提示** | 行情超过 `刷新间隔 × 倍数` 未更新（如网络中断）时，状态栏与悬浮提示自动标记 `$(warning)`，及时暴露数据停更                                         |
+| **图表面板**     | 支持查看**分时图、日K图、周K图、月K图**；可直接点击股票树节点或使用右键菜单 / 命令面板打开，面板内支持周期切换与手动刷新                         |
 | **扩展行情字段** | 除基础行情外，还展示换手率、振幅、量比、市盈率(TTM)、市净率、总市值，并在 A 股涨停 / 跌停时自动追加「涨停」「跌停」标记                            |
 | 关注列表管理     | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新                                                                                 |
 | 收藏置顶         | 收藏的股票在状态栏与列表中优先展示                                                                                                                 |
@@ -145,7 +146,27 @@ npm run compile
 
 在「资源管理器（Explorer）」面板中找到 **股票关注列表**：
 
-### 6. 命令列表
+- **单击任意股票**：直接打开图表面板
+- **右键菜单**：可从「查看图表」打开当前股票的分时图 / 日K图 / 周K图 / 月K图
+
+### 6. 查看图表
+
+执行方式有三种：
+
+1. 在「股票关注列表」中**单击股票**
+2. 在「股票关注列表」中**右键股票 → 查看图表**
+3. 在命令面板执行 `Stock Monitor: 查看图表（分时图 / 日K图 / 周K图 / 月K图）`
+
+图表面板顶部提供四个周期切换按钮：
+
+- `分时图`
+- `日K图`
+- `周K图`
+- `月K图`
+
+面板右上角的「刷新图表」按钮会重新拉取当前股票、当前周期的数据。若主行情轮询仍在运行，图表面板打开期间也会随着轮询自动刷新。
+
+### 7. 命令列表
 
 在命令面板（`Cmd/Ctrl + Shift + P`）输入 `Stock Monitor` 即可看到全部命令：
 
@@ -155,10 +176,11 @@ npm run compile
 | 移除股票                         | `stockMonitor.removeStock`    | 从关注列表删除                                   |
 | 收藏 / 取消收藏股票              | `stockMonitor.toggleFavorite` | 切换收藏状态，收藏项优先展示                     |
 | 设置持仓（别名 / 成本价 / 数量） | `stockMonitor.setPosition`    | 可视化维护持仓配置，用于计算当日收益与持仓总收益 |
+| 查看图表（分时图 / 日K图 / 周K图 / 月K图） | `stockMonitor.openChart` | 打开图表面板并切换查看对应周期 |
 | 立即刷新行情                     | `stockMonitor.refresh`        | 手动触发一次刷新                                 |
 | 显示运行日志                     | `stockMonitor.showLogs`       | 打开输出面板查看请求日志                         |
 
-### 7. 股票代码书写格式
+### 8. 股票代码书写格式
 
 添加股票时支持以下写法（大小写不敏感，可含空格）：
 
@@ -211,6 +233,7 @@ npm run compile
   ],
   "stockMonitor.decimals": 2,
   "stockMonitor.apiEndpoint": "https://qt.gtimg.cn",
+  "stockMonitor.chartApiEndpoint": "https://web.ifzq.gtimg.cn",
   "stockMonitor.requestTimeout": 5000,
   "stockMonitor.watchList": ["sh000001", "sz399001", "sh600519"],
   "stockMonitor.positions": [
@@ -239,6 +262,7 @@ npm run compile
 | `stockMonitor.stockColors`              | array   | `[]`                                                                | —                   | 单只股票颜色覆盖，元素为 `{ code, upColor?, downColor? }`                                                                            |
 | `stockMonitor.decimals`                 | number  | `2`                                                                 | 0 \~ 4              | 价格保留小数位数                                                                                                                     |
 | `stockMonitor.apiEndpoint`              | string  | `https://qt.gtimg.cn`                                               | —                   | 行情接口地址，可替换为自建或第三方代理                                                                                               |
+| `stockMonitor.chartApiEndpoint`         | string  | `https://web.ifzq.gtimg.cn`                                         | —                   | 图表接口地址，用于分时图 / 日K图 / 周K图 / 月K图；若默认地址不可用，可替换为支持同协议的代理                                           |
 | `stockMonitor.requestTimeout`           | number  | `5000`                                                              | 1000 \~ 30000       | 单次请求超时（毫秒）                                                                                                                 |
 | `stockMonitor.watchList`                | array   | `["sh000001","sz399001","sh600519"]`                                | —                   | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json`                                                                |
 | `stockMonitor.positions`                | array   | `[]`                                                                | —                   | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json`                 |
@@ -333,7 +357,7 @@ GET https://qt.gtimg.cn/q=sh600519,hk00700,usAAPL
 
 ### 自定义 / 代理接口
 
-若默认地址不可用（如内网限制、接口变更），可配置 `stockMonitor.apiEndpoint` 指向自建反向代理。要求代理：
+若默认地址不可用（如内网限制、接口变更），可配置 `stockMonitor.apiEndpoint` 与 `stockMonitor.chartApiEndpoint` 指向自建反向代理。要求代理：
 
 ---
 
@@ -407,15 +431,18 @@ src/
 ├── types.ts                  # 全局类型（不依赖 vscode，便于单测）
 ├── logger.ts                 # OutputChannel 日志封装
 ├── watchListStore.ts         # 关注列表存储（settings.json 为主，缓存保留展示元数据）
+├── chart.ts                  # 图表数据结构与响应解析（纯函数）
 ├── position.ts               # 持仓收益计算与配置归一化（纯函数）
 ├── alerts.ts                 # 价格 / 涨跌幅预警规则解析与判定（纯函数）
 ├── timeWindow.ts             # 刷新时间段解析与判断（纯函数）
 ├── market/
+│   ├── chartProvider.ts      # 腾讯分时 / K 线图表接口客户端
 │   ├── stockCode.ts          # 股票代码识别与归一化（纯函数）
 │   ├── quoteParser.ts        # 行情报文解析（纯函数）
 │   ├── tencentProvider.ts    # 腾讯接口 HTTP 客户端
 │   └── quoteService.ts       # 带缓存的行情服务（网络抖动降级）
 └── ui/
+    ├── chartPanel.ts         # 图表 Webview 面板
     ├── format.ts             # 数值/配色格式化（纯函数）
     ├── statusBarManager.ts   # 状态栏渲染
     └── watchListView.ts      # 关注列表树视图

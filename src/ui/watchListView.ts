@@ -60,6 +60,11 @@ export class WatchListProvider implements vscode.TreeDataProvider<WatchListNode>
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
     item.contextValue = stock.favorite ? CONTEXT_FAVORITE : CONTEXT_STOCK;
     item.id = stock.key;
+    item.command = {
+      command: 'stockMonitor.openChart',
+      title: '查看图表',
+      arguments: [stock],
+    };
 
     if (quote) {
       const parts = [
@@ -105,6 +110,7 @@ export class WatchListProvider implements vscode.TreeDataProvider<WatchListNode>
     } else {
       md.appendMarkdown('暂无行情数据  \n');
     }
+    md.appendMarkdown('\n---\n\n点击可打开分时图 / 日K图 / 周K图 / 月K图');
     item.tooltip = md;
 
     return item;

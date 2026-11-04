@@ -91,6 +91,8 @@ export interface StockMonitorConfig {
   decimals: number;
   /** 行情接口地址 */
   apiEndpoint: string;
+  /** 图表接口地址 */
+  chartApiEndpoint: string;
   /** 单次请求超时（毫秒） */
   requestTimeout: number;
   /** 首次启动时写入的默认关注列表 */
@@ -185,6 +187,9 @@ export function readConfig(): StockMonitorConfig {
     stockColors: normalizeStockColors(cfg.get<unknown>('stockColors', [])),
     decimals: clamp(cfg.get<number>('decimals', 2), 0, 4),
     apiEndpoint: (cfg.get<string>('apiEndpoint', 'https://qt.gtimg.cn') || 'https://qt.gtimg.cn').replace(/\/+$/, ''),
+    chartApiEndpoint: (
+      cfg.get<string>('chartApiEndpoint', 'https://web.ifzq.gtimg.cn') || 'https://web.ifzq.gtimg.cn'
+    ).replace(/\/+$/, ''),
     requestTimeout: clamp(cfg.get<number>('requestTimeout', 5000), 1000, 30000),
     initialWatchList: cfg.get<string[]>('watchList', ['sh000001', 'sz399001', 'sh600519']),
     positions: cfg.get<unknown>('positions', []),
