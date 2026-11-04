@@ -117,8 +117,10 @@ class StockMonitorController implements vscode.Disposable {
     this.config = readConfig();
     this.store = new WatchListStore(context, this.config.initialWatchList);
     this.statusBar = new StatusBarManager("stockMonitor.addStock");
-    this.chartPanel = new ChartPanel(context.extensionUri, (stock, period) =>
-      fetchChartData(stock, period, this.config),
+    this.chartPanel = new ChartPanel(
+      context.extensionUri,
+      (stock, period) => fetchChartData(stock, period, this.config),
+      () => this.config.chartPanelFloatMode,
     );
     this.treeProvider = new WatchListProvider(
       () => this.store.list(),

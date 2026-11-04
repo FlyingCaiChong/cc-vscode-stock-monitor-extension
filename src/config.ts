@@ -93,6 +93,8 @@ export interface StockMonitorConfig {
   apiEndpoint: string;
   /** 图表接口地址 */
   chartApiEndpoint: string;
+  /** 图表面板是否以“悬浮框”方式展示（旁边打开且不抢焦点） */
+  chartPanelFloatMode: boolean;
   /** 单次请求超时（毫秒） */
   requestTimeout: number;
   /** 首次启动时写入的默认关注列表 */
@@ -190,6 +192,7 @@ export function readConfig(): StockMonitorConfig {
     chartApiEndpoint: (
       cfg.get<string>('chartApiEndpoint', 'https://web.ifzq.gtimg.cn') || 'https://web.ifzq.gtimg.cn'
     ).replace(/\/+$/, ''),
+    chartPanelFloatMode: cfg.get<boolean>('chartPanelFloatMode', false),
     requestTimeout: clamp(cfg.get<number>('requestTimeout', 5000), 1000, 30000),
     initialWatchList: cfg.get<string[]>('watchList', ['sh000001', 'sz399001', 'sh600519']),
     positions: cfg.get<unknown>('positions', []),

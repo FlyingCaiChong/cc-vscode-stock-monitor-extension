@@ -39,6 +39,7 @@ suite('Stock Monitor 扩展冒烟测试', () => {
     assert.deepStrictEqual(config.get('stockColors'), []);
     assert.strictEqual(config.get('statusBarAlignment'), 'left');
     assert.strictEqual(config.get('chartApiEndpoint'), 'https://web.ifzq.gtimg.cn');
+    assert.strictEqual(config.get('chartPanelFloatMode'), false);
     assert.deepStrictEqual(config.get('positions'), []);
   });
 });

@@ -2,7 +2,7 @@
 
 在 VS Code **状态栏**与**资源管理器侧边栏**中实时监控 A 股 / 港股 / 美股行情。灵感来自 Stock Bar，支持自选股管理、收藏置顶、持仓收益、涨跌配色与丰富的自定义配置。
 
-> 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.6`
+> 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.7`
 
 ---
 
@@ -166,6 +166,16 @@ npm run compile
 
 面板右上角的「刷新图表」按钮会重新拉取当前股票、当前周期的数据。若主行情轮询仍在运行，图表面板打开期间也会随着轮询自动刷新。
 
+若你希望图表更像“悬浮框”而不是普通编辑页签，可开启：
+
+```jsonc
+{
+  "stockMonitor.chartPanelFloatMode": true
+}
+```
+
+开启后，图表会优先在旁边打开，并尽量不抢当前编辑器焦点；关闭后保持普通 Webview 面板打开方式。
+
 ### 7. 命令列表
 
 在命令面板（`Cmd/Ctrl + Shift + P`）输入 `Stock Monitor` 即可看到全部命令：
@@ -234,6 +244,7 @@ npm run compile
   "stockMonitor.decimals": 2,
   "stockMonitor.apiEndpoint": "https://qt.gtimg.cn",
   "stockMonitor.chartApiEndpoint": "https://web.ifzq.gtimg.cn",
+  "stockMonitor.chartPanelFloatMode": false,
   "stockMonitor.requestTimeout": 5000,
   "stockMonitor.watchList": ["sh000001", "sz399001", "sh600519"],
   "stockMonitor.positions": [
@@ -263,6 +274,7 @@ npm run compile
 | `stockMonitor.decimals`                 | number  | `2`                                                                 | 0 \~ 4              | 价格保留小数位数                                                                                                                     |
 | `stockMonitor.apiEndpoint`              | string  | `https://qt.gtimg.cn`                                               | —                   | 行情接口地址，可替换为自建或第三方代理                                                                                               |
 | `stockMonitor.chartApiEndpoint`         | string  | `https://web.ifzq.gtimg.cn`                                         | —                   | 图表接口地址，用于分时图 / 日K图 / 周K图 / 月K图；若默认地址不可用，可替换为支持同协议的代理                                           |
+| `stockMonitor.chartPanelFloatMode`      | boolean | `false`                                                             | `true` / `false`    | 是否以“悬浮框”方式展示图表面板。开启后在旁边打开且尽量不抢当前编辑器焦点，关闭后按普通 Webview 面板方式打开                           |
 | `stockMonitor.requestTimeout`           | number  | `5000`                                                              | 1000 \~ 30000       | 单次请求超时（毫秒）                                                                                                                 |
 | `stockMonitor.watchList`                | array   | `["sh000001","sz399001","sh600519"]`                                | —                   | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json`                                                                |
 | `stockMonitor.positions`                | array   | `[]`                                                                | —                   | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json`                 |

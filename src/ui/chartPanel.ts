@@ -12,6 +12,9 @@ type PanelMessage =
 /** 图表加载器：由控制器注入，负责真正请求远端接口 */
 type ChartLoader = (stock: StockCode, period: ChartPeriod) => Promise<StockChartData>;
 
+/** 面板展示模式：普通模式 / 悬浮框模式 */
+type FloatModeResolver = () => boolean;
+
 /** 查看图表的 Webview 面板 */
 export class ChartPanel implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
@@ -27,6 +30,7 @@ export class ChartPanel implements vscode.Disposable {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly loadChart: ChartLoader,
+    private readonly useFloatMode: FloatModeResolver,
   ) {
     void this.extensionUri;
   }
@@ -36,7 +40,7 @@ export class ChartPanel implements vscode.Disposable {
     this.currentStock = stock;
     this.currentDisplayName = displayName;
     this.ensurePanel();
-    this.panel?.reveal(vscode.ViewColumn.Active);
+    this.panel?.reveal(this.targetViewColumn(), this.useFloatMode());
     this.updateTitle();
     if (this.ready) {
       void this.loadCurrentChart();
@@ -56,10 +60,16 @@ export class ChartPanel implements vscode.Disposable {
       return;
     }
 
+    const floatMode = this.useFloatMode();
+
     this.panel = vscode.window.createWebviewPanel(
       'stockMonitorChart',
       '股票图表',
-      vscode.ViewColumn.Active,
+      {
+        viewColumn: this.targetViewColumn(),
+        // “悬浮框”模式下不抢当前编辑器焦点，更接近弹出层体验。
+        preserveFocus: floatMode,
+      },
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -155,6 +165,13 @@ export class ChartPanel implements vscode.Disposable {
     }
     const name = this.currentDisplayName || this.currentStock.code;
     this.panel.title = `${name} 图表`;
+  }
+
+  /** 根据配置决定图表面板的默认打开位置 */
+  private targetViewColumn(): vscode.ViewColumn {
+    // 悬浮框模式下优先在旁边打开，尽量不打断当前编辑上下文；
+    // 普通模式保持原来的当前列打开行为。
+    return this.useFloatMode() ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
   }
 
   private getHtml(webview: vscode.Webview): string {

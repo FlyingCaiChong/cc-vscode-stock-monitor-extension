@@ -13,6 +13,7 @@
 - **数据陈旧提示**：新增配置项 `stockMonitor.staleThresholdMultiplier`（默认 `5`，`0` 表示关闭），行情超过「刷新间隔 × 倍数」未更新时，状态栏与悬浮提示自动标记 `$(warning)` 并显示停更秒数。仅在开启自动刷新且处于刷新时段内生效。
 - **图表面板**：新增命令 `stockMonitor.openChart`，支持从命令面板、股票列表右键菜单或直接点击树节点打开图表面板，查看**分时图、日K图、周K图、月K图**，并支持在面板内切换周期与手动刷新。
 - 新增配置项 `stockMonitor.chartApiEndpoint`（默认 `https://web.ifzq.gtimg.cn`），用于图表接口地址覆盖，便于自建代理场景下继续使用图表功能。
+- 新增配置项 `stockMonitor.chartPanelFloatMode`（默认 `false`），用于控制 Webview 图表面板是否以“悬浮框”方式展示；开启后会在旁边打开并尽量不抢当前编辑器焦点。
 - 新增 `src/chart.ts`（图表响应解析纯函数）、`src/market/chartProvider.ts`（图表接口客户端）与 `src/ui/chartPanel.ts`（Webview 图表面板），并补充单元测试。
 - **扩展行情字段**：`Quote` 新增换手率 / 振幅 / 量比 / 市盈率(TTM) / 市净率 / 总市值 / 涨停价 / 跌停价，并在 `displayFields` 中新增对应字段（无数据时自动省略）；A 股触及涨 / 跌停时状态栏文本末尾自动追加「涨停」/「跌停」标记。
 - 新增插件图标 `images/stock_icon.png`（128×128 PNG），并通过 `package.json` 的 `icon` 字段在扩展列表与 Marketplace 中展示。
