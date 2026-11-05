@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AlertRule, normalizeAlerts } from './alerts';
 import { parseStockCode } from './market/stockCode';
 import {
   DEFAULT_REFRESH_TIME_RANGES,
@@ -39,6 +40,12 @@ export type DisplayField =
   | 'prevClose'
   | 'volume'
   | 'turnover'
+  | 'turnoverRate'
+  | 'amplitude'
+  | 'volumeRatio'
+  | 'peTtm'
+  | 'pb'
+  | 'marketCap'
   | 'time'
   | 'profit'
   | 'totalProfit';
@@ -53,6 +60,23 @@ export interface StockMonitorConfig {
   enableRefreshTimeRange: boolean;
   /** 允许自动刷新行情的时间段，为空时视为不限制 */
   refreshTimeRanges: RefreshTimeRange[];
+  /**
+   * 行情数据超过 N 个刷新周期仍未更新时，视为数据陈旧并标记到状态栏。
+   * 取 0 表示不检测。以「刷新周期」为单位可自动适配用户设置的刷新间隔。
+   */
+  staleThresholdMultiplier: number;
+  /** 价格 / 涨跌幅预警规则 */
+  alerts: AlertRule[];
+  /** 是否启用异动提醒（短时急速拉升 / 跳水、放量） */
+  enableAnomalyAlert: boolean;
+  /** 异动检测的价格观察窗口（秒） */
+  anomalyWindowSeconds: number;
+  /** 窗口内涨跌幅超过该百分数值即视为急拉 / 跳水 */
+  anomalyPriceChangePercent: number;
+  /** 量比达到该值即视为放量异动（仅 A 股提供量比），取 0 表示关闭 */
+  anomalyVolumeRatioThreshold: number;
+  /** 同一只股票同类异动的提醒冷却时间（秒） */
+  anomalyCooldownSeconds: number;
   /** 状态栏位置 */
   statusBarAlignment: StatusBarAlignment;
   /** 状态栏优先级，数值越大越靠前 */
@@ -77,6 +101,10 @@ export interface StockMonitorConfig {
   decimals: number;
   /** 行情接口地址 */
   apiEndpoint: string;
+  /** 图表接口地址 */
+  chartApiEndpoint: string;
+  /** 图表面板是否以“悬浮框”方式展示（旁边打开且不抢焦点） */
+  chartPanelFloatMode: boolean;
   /** 单次请求超时（毫秒） */
   requestTimeout: number;
   /** 首次启动时写入的默认关注列表 */
@@ -157,6 +185,13 @@ export function readConfig(): StockMonitorConfig {
     refreshTimeRanges: normalizeTimeRanges(
       cfg.get<unknown>('refreshTimeRanges', DEFAULT_REFRESH_TIME_RANGES),
     ),
+    staleThresholdMultiplier: clamp(cfg.get<number>('staleThresholdMultiplier', 5), 0, 60),
+    alerts: normalizeAlerts(cfg.get<unknown>('alerts', [])).alerts,
+    enableAnomalyAlert: cfg.get<boolean>('enableAnomalyAlert', true),
+    anomalyWindowSeconds: clamp(cfg.get<number>('anomalyWindowSeconds', 60), 30, 600),
+    anomalyPriceChangePercent: clamp(cfg.get<number>('anomalyPriceChangePercent', 1.5), 0.1, 20),
+    anomalyVolumeRatioThreshold: clamp(cfg.get<number>('anomalyVolumeRatioThreshold', 3), 0, 50),
+    anomalyCooldownSeconds: clamp(cfg.get<number>('anomalyCooldownSeconds', 300), 0, 3600),
     statusBarAlignment: cfg.get<StatusBarAlignment>('statusBarAlignment', 'left'),
     statusBarPriority: cfg.get<number>('statusBarPriority', 100),
     maxStatusBarItems: clamp(cfg.get<number>('maxStatusBarItems', 6), 1, 20),
@@ -169,6 +204,10 @@ export function readConfig(): StockMonitorConfig {
     stockColors: normalizeStockColors(cfg.get<unknown>('stockColors', [])),
     decimals: clamp(cfg.get<number>('decimals', 2), 0, 4),
     apiEndpoint: (cfg.get<string>('apiEndpoint', 'https://qt.gtimg.cn') || 'https://qt.gtimg.cn').replace(/\/+$/, ''),
+    chartApiEndpoint: (
+      cfg.get<string>('chartApiEndpoint', 'https://web.ifzq.gtimg.cn') || 'https://web.ifzq.gtimg.cn'
+    ).replace(/\/+$/, ''),
+    chartPanelFloatMode: cfg.get<boolean>('chartPanelFloatMode', false),
     requestTimeout: clamp(cfg.get<number>('requestTimeout', 5000), 1000, 30000),
     initialWatchList: cfg.get<string[]>('watchList', ['sh000001', 'sz399001', 'sh600519']),
     positions: cfg.get<unknown>('positions', []),

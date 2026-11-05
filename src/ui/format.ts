@@ -72,6 +72,34 @@ export function colorIdForStock(
   );
 }
 
+/** 涨跌停判定允许的误差（价格保留 2 位小数，用半分作为容差） */
+const LIMIT_EPSILON = 0.001;
+
+/**
+ * 判断是否处于涨/跌停状态。
+ * 仅 A 股提供涨跌停价，其它市场 `limitUp` / `limitDown` 恒为 0，此处自然返回无状态。
+ */
+export function limitStatusOf(
+  quote: Pick<Quote, 'price' | 'limitUp' | 'limitDown'>
+): Trend | undefined {
+  if (quote.limitUp > 0 && quote.price >= quote.limitUp - LIMIT_EPSILON) {
+    return 'up';
+  }
+  if (quote.limitDown > 0 && quote.price <= quote.limitDown + LIMIT_EPSILON) {
+    return 'down';
+  }
+  return undefined;
+}
+
+/** 涨跌停标记文案，如「涨停」；未涨跌停时返回空串 */
+export function limitLabelOf(quote: Pick<Quote, 'price' | 'limitUp' | 'limitDown'>): string {
+  const status = limitStatusOf(quote);
+  if (status === 'up') {
+    return '涨停';
+  }
+  return status === 'down' ? '跌停' : '';
+}
+
 /** 固定小数位 */
 export function formatNumber(value: number, decimals: number): string {
   if (!Number.isFinite(value)) {
@@ -183,6 +211,36 @@ export function formatStatusBarText(
       case 'turnover':
         parts.push(formatTurnover(quote.turnover));
         break;
+      case 'turnoverRate':
+        if (quote.turnoverRate > 0) {
+          parts.push(`换手 ${formatNumber(quote.turnoverRate, 2)}%`);
+        }
+        break;
+      case 'amplitude':
+        if (quote.amplitude > 0) {
+          parts.push(`振幅 ${formatNumber(quote.amplitude, 2)}%`);
+        }
+        break;
+      case 'volumeRatio':
+        if (quote.volumeRatio > 0) {
+          parts.push(`量比 ${formatNumber(quote.volumeRatio, 2)}`);
+        }
+        break;
+      case 'peTtm':
+        if (quote.peTtm > 0) {
+          parts.push(`PE ${formatNumber(quote.peTtm, 2)}`);
+        }
+        break;
+      case 'pb':
+        if (quote.pb > 0) {
+          parts.push(`PB ${formatNumber(quote.pb, 2)}`);
+        }
+        break;
+      case 'marketCap':
+        if (quote.marketCap > 0) {
+          parts.push(`市值 ${formatTurnover(quote.marketCap)}`);
+        }
+        break;
       case 'time':
         parts.push(quote.time);
         break;
@@ -201,12 +259,15 @@ export function formatStatusBarText(
         break;
     }
   }
-  return parts.filter(Boolean).join(' ');
+  const text = parts.filter(Boolean).join(' ');
+  // 涨跌停是强信号，无需额外配置即在状态栏末尾自动标记
+  const limitLabel = limitLabelOf(quote);
+  return limitLabel ? `${text} ${limitLabel}` : text;
 }
 
 /** 悬浮提示的明细行，[标签, 值] */
 export function detailRows(quote: Quote, decimals: number): Array<[string, string]> {
-  return [
+  const rows: Array<[string, string]> = [
     ['最新价', formatNumber(quote.price, decimals)],
     ['涨跌额', formatSigned(quote.change, decimals)],
     ['涨跌幅', `${formatSigned(quote.changePercent, 2)}%`],
@@ -216,8 +277,39 @@ export function detailRows(quote: Quote, decimals: number): Array<[string, strin
     ['最低', formatNumber(quote.low, decimals)],
     ['成交量', formatVolume(quote.volume)],
     ['成交额', formatTurnover(quote.turnover)],
-    ['行情时间', quote.time || '--'],
   ];
+  // 以下字段并非所有市场都提供（港股无换手率、港美股无量比 / 涨跌停价），
+  // 仅在拿到有效数值时追加，避免展示无意义的 0。
+  if (quote.turnoverRate > 0) {
+    rows.push(['换手率', `${formatNumber(quote.turnoverRate, 2)}%`]);
+  }
+  if (quote.amplitude > 0) {
+    rows.push(['振幅', `${formatNumber(quote.amplitude, 2)}%`]);
+  }
+  if (quote.volumeRatio > 0) {
+    rows.push(['量比', formatNumber(quote.volumeRatio, 2)]);
+  }
+  if (quote.peTtm > 0) {
+    rows.push(['市盈率(TTM)', formatNumber(quote.peTtm, 2)]);
+  }
+  if (quote.pb > 0) {
+    rows.push(['市净率', formatNumber(quote.pb, 2)]);
+  }
+  if (quote.marketCap > 0) {
+    rows.push(['总市值', formatTurnover(quote.marketCap)]);
+  }
+  if (quote.limitUp > 0) {
+    rows.push(['涨停价', formatNumber(quote.limitUp, decimals)]);
+  }
+  if (quote.limitDown > 0) {
+    rows.push(['跌停价', formatNumber(quote.limitDown, decimals)]);
+  }
+  const limitLabel = limitLabelOf(quote);
+  if (limitLabel) {
+    rows.push(['状态', limitLabel]);
+  }
+  rows.push(['行情时间', quote.time || '--']);
+  return rows;
 }
 
 /**

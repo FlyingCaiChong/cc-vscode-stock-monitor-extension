@@ -19,6 +19,7 @@ suite('Stock Monitor 扩展冒烟测试', () => {
       'stockMonitor.removeStock',
       'stockMonitor.toggleFavorite',
       'stockMonitor.setPosition',
+      'stockMonitor.openChart',
       'stockMonitor.refresh',
       'stockMonitor.showLogs',
     ]) {
@@ -37,6 +38,13 @@ suite('Stock Monitor 扩展冒烟测试', () => {
     assert.strictEqual(config.get('downColor'), '');
     assert.deepStrictEqual(config.get('stockColors'), []);
     assert.strictEqual(config.get('statusBarAlignment'), 'left');
+    assert.strictEqual(config.get('chartApiEndpoint'), 'https://web.ifzq.gtimg.cn');
+    assert.strictEqual(config.get('chartPanelFloatMode'), false);
+    assert.strictEqual(config.get('enableAnomalyAlert'), true);
+    assert.strictEqual(config.get('anomalyWindowSeconds'), 60);
+    assert.strictEqual(config.get('anomalyPriceChangePercent'), 1.5);
+    assert.strictEqual(config.get('anomalyVolumeRatioThreshold'), 3);
+    assert.strictEqual(config.get('anomalyCooldownSeconds'), 300);
     assert.deepStrictEqual(config.get('positions'), []);
   });
 });

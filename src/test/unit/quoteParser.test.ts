@@ -11,9 +11,9 @@ const SH600519: StockCode = { key: 'sh600519', code: '600519', market: 'sh' };
 const HK00700: StockCode = { key: 'hk00700', code: '00700', market: 'hk' };
 const US_AAPL: StockCode = { key: 'usAAPL', code: 'AAPL', market: 'us' };
 
-/** 构造一条 40 字段的行情报文（含关键字段默认值，可按下标覆盖） */
+/** 构造一条 50 字段的行情报文（含关键字段默认值，可按下标覆盖） */
 function buildPayload(overrides: Record<number, string> = {}): string {
-  const fields = new Array<string>(40).fill('0');
+  const fields = new Array<string>(50).fill('0');
   fields[0] = '1';
   fields[1] = '贵州茅台';
   fields[2] = '600519';
@@ -119,5 +119,52 @@ suite('quoteParser / parseQuoteLine', () => {
     assert.strictEqual(quote.open, quote.price);
     assert.strictEqual(quote.high, quote.price);
     assert.strictEqual(quote.low, quote.price);
+  });
+});
+
+suite('quoteParser / 扩展统计字段', () => {
+  test('A 股：换手率 / 市盈率 / 振幅 / 市值 / 市净率 / 涨跌停 / 量比全部解析', () => {
+    const text = `v_sh600519="${buildPayload({
+      38: '0.59',
+      39: '28.60',
+      43: '3.20',
+      45: '16720.00',
+      46: '8.10',
+      47: '1461.49',
+      48: '1195.31',
+      49: '1.35',
+    })}";`;
+    const quote = parseQuoteResponse(text, [SH600519]).get('sh600519');
+    assert.ok(quote);
+    assert.strictEqual(quote.turnoverRate, 0.59);
+    assert.strictEqual(quote.peTtm, 28.6);
+    assert.strictEqual(quote.amplitude, 3.2);
+    // 接口单位为「亿」，解析后统一换算为「元」
+    assert.strictEqual(quote.marketCap, 16720 * 1e8);
+    assert.strictEqual(quote.pb, 8.1);
+    assert.strictEqual(quote.limitUp, 1461.49);
+    assert.strictEqual(quote.limitDown, 1195.31);
+    assert.strictEqual(quote.volumeRatio, 1.35);
+  });
+
+  test('港美股：忽略 46 ~ 49 位置（该处是英文名 / 52 周高低价，非市净率与涨跌停）', () => {
+    const text = `v_hk00700="${buildPayload({
+      1: '腾讯控股',
+      2: '00700',
+      3: '588.5',
+      46: 'TENCENT',
+      47: '700.50',
+      48: '200.10',
+      49: '0.99',
+    })}";`;
+    const hk = parseQuoteResponse(text, [HK00700]).get('hk00700');
+    assert.ok(hk);
+    assert.strictEqual(hk.pb, 0);
+    assert.strictEqual(hk.limitUp, 0);
+    assert.strictEqual(hk.limitDown, 0);
+    assert.strictEqual(hk.volumeRatio, 0);
+    // 通用字段仍可正常读取
+    assert.strictEqual(hk.turnoverRate, 0);
+    assert.strictEqual(hk.marketCap, 0);
   });
 });

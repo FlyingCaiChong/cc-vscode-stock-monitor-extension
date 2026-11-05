@@ -1,4 +1,12 @@
 import * as vscode from "vscode";
+import { evaluateAlerts } from "./alerts";
+import {
+  AnomalyEvent,
+  AnomalySettings,
+  createAnomalyState,
+  detectAnomalies,
+  resetAnomalyState,
+} from "./anomaly";
 import {
   CONFIG_SECTION,
   onConfigChanged,
@@ -6,6 +14,7 @@ import {
   StockMonitorConfig,
 } from "./config";
 import { logger } from "./logger";
+import { fetchChartData } from "./market/chartProvider";
 import { QuoteService } from "./market/quoteService";
 import { MARKET_LABEL, parseStockCode } from "./market/stockCode";
 import { normalizePositions, PositionMap } from "./position";
@@ -18,6 +27,7 @@ import {
   WatchedStock,
 } from "./types";
 import { StatusBarManager } from "./ui/statusBarManager";
+import { ChartPanel } from "./ui/chartPanel";
 import { WatchListProvider, WatchListNode } from "./ui/watchListView";
 import { WatchListStore } from "./watchListStore";
 
@@ -70,6 +80,8 @@ class StockMonitorController implements vscode.Disposable {
 
   private readonly treeProvider: WatchListProvider;
 
+  private readonly chartPanel: ChartPanel;
+
   private readonly disposables: vscode.Disposable[] = [];
 
   /** 最近一次成功获取的行情快照 */
@@ -96,6 +108,21 @@ class StockMonitorController implements vscode.Disposable {
   /** 上一次定时刷新是否因不在时间段内被跳过，用于避免重复日志 */
   private timerPausedOutsideWindow = false;
 
+  /** 当前触发预警的股票：key -> 触发原因，用于状态栏高亮与悬浮提示 */
+  private alertHits = new Map<string, string[]>();
+
+  /**
+   * 本轮已提醒过的预警股票。
+   * 条件恢复（如价格回落）后会自动移除，从而重新武装、可再次提醒，避免持续刷屏。
+   */
+  private readonly notifiedAlerts = new Set<string>();
+
+  /**
+   * 异动检测器的运行时状态（采样历史与冷却记录）。
+   * 与价格预警不同，异动是瞬时事件，不需要在状态栏保留高亮状态。
+   */
+  private readonly anomalyState = createAnomalyState();
+
   /** 启动时是否需要把旧版持仓缓存回填到 settings.json */
   private needsPositionConfigBackfill = false;
 
@@ -103,6 +130,11 @@ class StockMonitorController implements vscode.Disposable {
     this.config = readConfig();
     this.store = new WatchListStore(context, this.config.initialWatchList);
     this.statusBar = new StatusBarManager("stockMonitor.addStock");
+    this.chartPanel = new ChartPanel(
+      context.extensionUri,
+      (stock, period) => fetchChartData(stock, period, this.config),
+      () => this.config.chartPanelFloatMode,
+    );
     this.treeProvider = new WatchListProvider(
       () => this.store.list(),
       (key) => this.quotes.get(key),
@@ -129,6 +161,10 @@ class StockMonitorController implements vscode.Disposable {
       vscode.commands.registerCommand(
         "stockMonitor.setPosition",
         (node?: unknown) => this.setPosition(node),
+      ),
+      vscode.commands.registerCommand(
+        "stockMonitor.openChart",
+        (node?: unknown) => this.openChart(node),
       ),
       vscode.commands.registerCommand("stockMonitor.refresh", () =>
         this.refresh("manual"),
@@ -177,8 +213,128 @@ class StockMonitorController implements vscode.Disposable {
       this.quotes,
       this.positions,
       this.config,
+      {
+        alerts: this.alertHits,
+        staleAfterSeconds: this.staleAfterSeconds(),
+      },
     );
     this.treeProvider.refresh();
+  }
+
+  /**
+   * 数据陈旧判定的时间阈值（秒）。
+   *
+   * 仅在「确实应当持续刷新」时才启用，否则会误报：
+   * - 关闭自动刷新时，数据本来就不会更新
+   * - 处于非刷新时段时，本来就暂停了请求
+   * - 阈值为 0 表示用户主动关闭该检测
+   */
+  private staleAfterSeconds(): number | undefined {
+    if (this.config.staleThresholdMultiplier <= 0 || !this.config.autoRefresh) {
+      return undefined;
+    }
+    if (!this.isWithinRefreshWindow()) {
+      return undefined;
+    }
+    return this.config.refreshInterval * this.config.staleThresholdMultiplier;
+  }
+
+  /**
+   * 评估预警规则：刷新状态栏高亮，并对「新触发」的规则弹出提醒。
+   *
+   * 「新触发」的判定配合 `AlertRule.once` 使用：同一条规则在条件持续成立期间只提醒一次，
+   * 条件恢复后自动重新武装。
+   */
+  private evaluateAlertRules(): void {
+    const hits = evaluateAlerts(this.config.alerts, this.quotes);
+    this.alertHits = hits;
+    // 条件恢复的规则重新武装
+    for (const key of [...this.notifiedAlerts]) {
+      if (!hits.has(key)) {
+        this.notifiedAlerts.delete(key);
+      }
+    }
+    if (hits.size === 0) {
+      return;
+    }
+    const rules = new Map(this.config.alerts.map((rule) => [rule.key, rule]));
+    for (const [key, reasons] of hits) {
+      const rule = rules.get(key);
+      if (!rule || (rule.once && this.notifiedAlerts.has(key))) {
+        continue;
+      }
+      this.notifiedAlerts.add(key);
+      this.notifyAlert(key, reasons);
+    }
+  }
+
+  /** 从当前配置中提取异动提醒设置 */
+  private anomalySettings(): AnomalySettings {
+    return {
+      enabled: this.config.enableAnomalyAlert,
+      windowSeconds: this.config.anomalyWindowSeconds,
+      priceChangePercent: this.config.anomalyPriceChangePercent,
+      volumeRatioThreshold: this.config.anomalyVolumeRatioThreshold,
+      cooldownSeconds: this.config.anomalyCooldownSeconds,
+    };
+  }
+
+  /**
+   * 检测行情异动并逐条提醒。
+   *
+   * 与价格预警的区别：异动是「短时相对变化」的瞬时事件，只在命中那一刻提醒一次，
+   * 冷却期内不再重复提醒，也不在状态栏留下持续高亮。
+   */
+  private evaluateAnomalies(): void {
+    const events = detectAnomalies(
+      this.quotes,
+      this.anomalySettings(),
+      this.anomalyState,
+      Date.now(),
+    );
+    for (const event of events) {
+      void this.notifyAnomaly(event);
+    }
+  }
+
+  /** 弹出异动提醒，并提供「查看图表」入口（同时写入日志，便于回溯） */
+  private async notifyAnomaly(event: AnomalyEvent): Promise<void> {
+    try {
+      const name =
+        this.positions.get(event.key)?.alias ||
+        this.quotes.get(event.key)?.name ||
+        event.key;
+      const message = `Stock Monitor 异动：${name} ${event.message}`;
+      logger.warn(message);
+      const choice = await vscode.window.showInformationMessage(
+        message,
+        "查看图表",
+      );
+      if (choice !== "查看图表") {
+        return;
+      }
+      const stock = this.store.list().find((item) => item.key === event.key);
+      if (stock) {
+        await this.openChart(stock);
+      }
+    } catch (err) {
+      logger.error("弹出异动提醒失败", err);
+    }
+  }
+
+  /** 弹出预警提醒（同时写入日志，便于回溯） */
+  private notifyAlert(key: string, reasons: readonly string[]): void {
+    const name =
+      this.positions.get(key)?.alias || this.quotes.get(key)?.name || key;
+    const message = `Stock Monitor 预警：${name} ${reasons.join("；")}`;
+    logger.warn(message);
+    void vscode.window
+      .showWarningMessage(message, "查看日志")
+      .then((choice) => {
+        if (choice === "查看日志") {
+          logger.show();
+        }
+      });
   }
 
   /**
@@ -276,6 +432,9 @@ class StockMonitorController implements vscode.Disposable {
     if (stocks.length === 0) {
       this.quotes = new Map();
       this.service.clear();
+      this.alertHits = new Map();
+      this.notifiedAlerts.clear();
+      resetAnomalyState(this.anomalyState);
       this.render();
       return;
     }
@@ -293,7 +452,12 @@ class StockMonitorController implements vscode.Disposable {
       for (const quote of quotes.values()) {
         this.store.updateName(quote.key, quote.name);
       }
+      // 先评估预警（更新高亮与弹窗状态），再渲染，保证状态栏与提示同步
+      this.evaluateAlertRules();
+      // 异动检测依赖连续采样，需在每轮行情更新后执行
+      this.evaluateAnomalies();
       this.render();
+      await this.chartPanel.refreshVisible();
       if (error) {
         this.notifyError(error, reason);
       } else {
@@ -596,6 +760,31 @@ class StockMonitorController implements vscode.Disposable {
     return this.positions.get(stock.key)?.alias || stock.name || stock.code;
   }
 
+  /**
+   * 打开图表面板。
+   *
+   * 支持两种入口：
+   * 1. 树视图点击 / 右键菜单传入具体股票
+   * 2. 命令面板无参执行时，先弹出 QuickPick 让用户选择
+   */
+  private async openChart(node?: unknown): Promise<void> {
+    const target =
+      toWatchedStock(node) ??
+      (await this.pickStock("查看图表", "选择要查看图表的股票"));
+    if (!target) {
+      return;
+    }
+    try {
+      const displayName = this.displayNameOf(target);
+      this.chartPanel.show(target, displayName);
+    } catch (err) {
+      logger.error("打开图表面板失败", err);
+      void vscode.window.showErrorMessage(
+        `Stock Monitor：打开图表面板失败：${err instanceof Error ? err.message : "未知错误"}`,
+      );
+    }
+  }
+
   /** 数字输入校验：留空合法，否则必须为大于 0 的数字 */
   private positiveNumberValidator(
     label: string,
@@ -654,6 +843,7 @@ class StockMonitorController implements vscode.Disposable {
       disposable.dispose();
     }
     this.statusBar.dispose();
+    this.chartPanel.dispose();
     this.treeProvider.dispose();
     this.store.dispose();
     logger.dispose();
