@@ -67,6 +67,16 @@ export interface StockMonitorConfig {
   staleThresholdMultiplier: number;
   /** 价格 / 涨跌幅预警规则 */
   alerts: AlertRule[];
+  /** 是否启用异动提醒（短时急速拉升 / 跳水、放量） */
+  enableAnomalyAlert: boolean;
+  /** 异动检测的价格观察窗口（秒） */
+  anomalyWindowSeconds: number;
+  /** 窗口内涨跌幅超过该百分数值即视为急拉 / 跳水 */
+  anomalyPriceChangePercent: number;
+  /** 量比达到该值即视为放量异动（仅 A 股提供量比），取 0 表示关闭 */
+  anomalyVolumeRatioThreshold: number;
+  /** 同一只股票同类异动的提醒冷却时间（秒） */
+  anomalyCooldownSeconds: number;
   /** 状态栏位置 */
   statusBarAlignment: StatusBarAlignment;
   /** 状态栏优先级，数值越大越靠前 */
@@ -177,6 +187,11 @@ export function readConfig(): StockMonitorConfig {
     ),
     staleThresholdMultiplier: clamp(cfg.get<number>('staleThresholdMultiplier', 5), 0, 60),
     alerts: normalizeAlerts(cfg.get<unknown>('alerts', [])).alerts,
+    enableAnomalyAlert: cfg.get<boolean>('enableAnomalyAlert', true),
+    anomalyWindowSeconds: clamp(cfg.get<number>('anomalyWindowSeconds', 60), 30, 600),
+    anomalyPriceChangePercent: clamp(cfg.get<number>('anomalyPriceChangePercent', 1.5), 0.1, 20),
+    anomalyVolumeRatioThreshold: clamp(cfg.get<number>('anomalyVolumeRatioThreshold', 3), 0, 50),
+    anomalyCooldownSeconds: clamp(cfg.get<number>('anomalyCooldownSeconds', 300), 0, 3600),
     statusBarAlignment: cfg.get<StatusBarAlignment>('statusBarAlignment', 'left'),
     statusBarPriority: cfg.get<number>('statusBarPriority', 100),
     maxStatusBarItems: clamp(cfg.get<number>('maxStatusBarItems', 6), 1, 20),

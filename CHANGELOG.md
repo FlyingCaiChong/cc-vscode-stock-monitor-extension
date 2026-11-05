@@ -10,6 +10,7 @@
 - 新增开关 `stockMonitor.enableRefreshTimeRange`（默认 `true`）控制时段限制的启用；关闭后全天自动刷新。该限制仅作用于定时刷新，手动刷新（点击状态栏项 / 「立即刷新行情」命令）与启动刷新始终可用。
 - 新增 `src/timeWindow.ts` 纯函数模块及单元测试（时间解析、配置容错归一化、时段判断）。
 - **价格预警**：新增配置项 `stockMonitor.alerts`，支持为每只股票配置 `above` / `below`（价格上 / 下破）与 `changePercentAbove` / `changePercentBelow`（涨跌幅上 / 下破）阈值。触发后状态栏显示 `$(bell)` 高亮并弹窗提醒，悬浮提示顶部列出触发原因；`once`（默认 `true`）保证「未触发 → 触发」只提醒一次，条件恢复后自动重新武装。新增 `src/alerts.ts` 纯函数模块及单元测试。
+- **异动提醒**：新增配置项 `stockMonitor.enableAnomalyAlert`（默认 `true`）、`stockMonitor.anomalyWindowSeconds`（默认 `60`）、`stockMonitor.anomalyPriceChangePercent`（默认 `1.5`）、`stockMonitor.anomalyVolumeRatioThreshold`（默认 `3`，`0` 表示关闭）、`stockMonitor.anomalyCooldownSeconds`（默认 `300`）。行情在观察窗口内**急速拉升 / 跳水**，或 A 股**量比达到阈值**（放量）时弹窗提醒，通知中提供「查看图表」入口；同一只股票同类型异动在冷却期内不重复提醒。与价格预警的区别：异动关注短时相对变化、属于瞬时事件，不会在状态栏留下持续高亮。新增 `src/anomaly.ts` 纯函数模块及单元测试。
 - **数据陈旧提示**：新增配置项 `stockMonitor.staleThresholdMultiplier`（默认 `5`，`0` 表示关闭），行情超过「刷新间隔 × 倍数」未更新时，状态栏与悬浮提示自动标记 `$(warning)` 并显示停更秒数。仅在开启自动刷新且处于刷新时段内生效。
 - **图表面板**：新增命令 `stockMonitor.openChart`，支持从命令面板、股票列表右键菜单或直接点击树节点打开图表面板，查看**分时图、日K图、周K图、月K图**，并支持在面板内切换周期与手动刷新。
 - 新增配置项 `stockMonitor.chartApiEndpoint`（默认 `https://web.ifzq.gtimg.cn`），用于图表接口地址覆盖，便于自建代理场景下继续使用图表功能。

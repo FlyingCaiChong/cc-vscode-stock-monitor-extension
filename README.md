@@ -2,7 +2,7 @@
 
 在 VS Code **状态栏**与**资源管理器侧边栏**中实时监控 A 股 / 港股 / 美股行情。灵感来自 Stock Bar，支持自选股管理、收藏置顶、持仓收益、涨跌配色与丰富的自定义配置。
 
-> 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.7`
+> 插件 ID：`stock-monitor.vscode-stock-monitor-extension`　版本：`1.1.8`
 
 ---
 
@@ -14,8 +14,9 @@
 | 自动轮询刷新     | 默认每 10 秒刷新，可在 5 \~ 300 秒之间配置；可通过 `stockMonitor.autoRefresh` 关闭定时刷新；网络抖动时自动降级展示上一次成功的行情                 |
 | **刷新时段限制** | 可配置仅在指定时间段内自动刷新（默认 `09:00-11:35`、`12:55-15:05`），减少非交易时段的无效请求；可用 `stockMonitor.enableRefreshTimeRange` 关闭限制 |
 | **价格预警**     | 为每只股票配置价格上 / 下破、涨跌幅上 / 下破阈值，触发时状态栏高亮 `$(bell)` 并弹窗提醒；支持「只提醒一次，条件恢复后自动重新武装」                |
+| **异动提醒**     | 行情出现**短时急速拉升 / 跳水**（如 1 分钟内波动超 1.5%）或 A 股**量比骤增**（放量）时弹窗提醒，支持观察窗口与冷却时间配置                         |
 | **数据陈旧提示** | 行情超过 `刷新间隔 × 倍数` 未更新（如网络中断）时，状态栏与悬浮提示自动标记 `$(warning)`，及时暴露数据停更                                         |
-| **图表面板**     | 支持查看**分时图、日K图、周K图、月K图**；可直接点击股票树节点或使用右键菜单 / 命令面板打开，面板内支持周期切换与手动刷新                         |
+| **图表面板**     | 支持查看**分时图、日K图、周K图、月K图**；可直接点击股票树节点或使用右键菜单 / 命令面板打开，面板内支持周期切换与手动刷新                           |
 | **扩展行情字段** | 除基础行情外，还展示换手率、振幅、量比、市盈率(TTM)、市净率、总市值，并在 A 股涨停 / 跌停时自动追加「涨停」「跌停」标记                            |
 | 关注列表管理     | 资源管理器中的「股票关注列表」视图，支持添加、移除、收藏与一键刷新                                                                                 |
 | 收藏置顶         | 收藏的股票在状态栏与列表中优先展示                                                                                                                 |
@@ -136,20 +137,44 @@ npm run compile
 - `once`（默认 `true`）表示「未触发 → 触发」的瞬间只提醒一次；当价格回落 / 涨跌幅回到区间内后会自动**重新武装**，下次越界可再次提醒，避免持续刷屏。
 - 触发高亮对**所有越界状态**生效（包括已提醒过的），因此状态栏可始终反映当前是否处于预警区间。
 
-### 4. 数据陈旧提示
+### 4. 异动提醒
+
+与「价格预警」不同，异动提醒关注的是**短时相对变化**：价格在观察窗口内急速波动，或 A 股量比骤增（放量）时弹出一条提示通知，点击「查看图表」可直接查看该股票走势。
+
+| 异动类型 | 触发条件                                                               |
+| -------- | ---------------------------------------------------------------------- |
+| 急速拉升 | 观察窗口内涨幅达到 `stockMonitor.anomalyPriceChangePercent`            |
+| 急速跳水 | 观察窗口内跌幅达到 `stockMonitor.anomalyPriceChangePercent`            |
+| 放量异动 | 量比达到 `stockMonitor.anomalyVolumeRatioThreshold`（仅 A 股提供量比） |
+
+```jsonc
+{
+  "stockMonitor.enableAnomalyAlert": true, // 异动提醒总开关
+  "stockMonitor.anomalyWindowSeconds": 60, // 观察窗口：统计最近 60 秒的价格变化
+  "stockMonitor.anomalyPriceChangePercent": 1.5, // 窗口内波动超过 1.5% 即视为异动
+  "stockMonitor.anomalyVolumeRatioThreshold": 3, // 量比达到 3 视为放量，0 表示关闭
+  "stockMonitor.anomalyCooldownSeconds": 300, // 同一只股票同类型异动 5 分钟内只提醒一次
+}
+```
+
+- 需积累满一个观察窗口的行情数据后才会开始判断，避免刚启动监控时把一小段涨幅误判为异动。
+- 冷却期内的同类型异动不会重复提醒；异动属于**瞬时事件**，不会像价格预警那样在状态栏留下持续高亮。
+- 观察窗口与阈值越小越灵敏，实际使用中建议结合个股波动性（如大盘股可调低阈值，小盘股适当调高）调整。
+
+### 5. 数据陈旧提示
 
 行情数据超过 `刷新间隔 × stockMonitor.staleThresholdMultiplier`（默认 5 倍）仍未更新时，状态栏项与悬浮提示会标记 `$(warning)` 并显示距上次更新的秒数，用于发现网络中断等导致的数据停更。
 
 该检测仅在**开启自动刷新且处于刷新时间段内**时生效，避免在非交易时段误报；将 `stockMonitor.staleThresholdMultiplier` 设为 `0` 可完全关闭。
 
-### 5. 股票关注列表（侧边栏）
+### 6. 股票关注列表（侧边栏）
 
 在「资源管理器（Explorer）」面板中找到 **股票关注列表**：
 
 - **单击任意股票**：直接打开图表面板
 - **右键菜单**：可从「查看图表」打开当前股票的分时图 / 日K图 / 周K图 / 月K图
 
-### 6. 查看图表
+### 7. 查看图表
 
 执行方式有三种：
 
@@ -170,27 +195,27 @@ npm run compile
 
 ```jsonc
 {
-  "stockMonitor.chartPanelFloatMode": true
+  "stockMonitor.chartPanelFloatMode": true,
 }
 ```
 
 开启后，图表会优先在旁边打开，并尽量不抢当前编辑器焦点；关闭后保持普通 Webview 面板打开方式。
 
-### 7. 命令列表
+### 8. 命令列表
 
 在命令面板（`Cmd/Ctrl + Shift + P`）输入 `Stock Monitor` 即可看到全部命令：
 
-| 命令                             | 标识                          | 说明                                             |
-| -------------------------------- | ----------------------------- | ------------------------------------------------ |
-| 添加股票                         | `stockMonitor.addStock`       | 输入代码并校验真实性后加入关注列表               |
-| 移除股票                         | `stockMonitor.removeStock`    | 从关注列表删除                                   |
-| 收藏 / 取消收藏股票              | `stockMonitor.toggleFavorite` | 切换收藏状态，收藏项优先展示                     |
-| 设置持仓（别名 / 成本价 / 数量） | `stockMonitor.setPosition`    | 可视化维护持仓配置，用于计算当日收益与持仓总收益 |
-| 查看图表（分时图 / 日K图 / 周K图 / 月K图） | `stockMonitor.openChart` | 打开图表面板并切换查看对应周期 |
-| 立即刷新行情                     | `stockMonitor.refresh`        | 手动触发一次刷新                                 |
-| 显示运行日志                     | `stockMonitor.showLogs`       | 打开输出面板查看请求日志                         |
+| 命令                                       | 标识                          | 说明                                             |
+| ------------------------------------------ | ----------------------------- | ------------------------------------------------ |
+| 添加股票                                   | `stockMonitor.addStock`       | 输入代码并校验真实性后加入关注列表               |
+| 移除股票                                   | `stockMonitor.removeStock`    | 从关注列表删除                                   |
+| 收藏 / 取消收藏股票                        | `stockMonitor.toggleFavorite` | 切换收藏状态，收藏项优先展示                     |
+| 设置持仓（别名 / 成本价 / 数量）           | `stockMonitor.setPosition`    | 可视化维护持仓配置，用于计算当日收益与持仓总收益 |
+| 查看图表（分时图 / 日K图 / 周K图 / 月K图） | `stockMonitor.openChart`      | 打开图表面板并切换查看对应周期                   |
+| 立即刷新行情                               | `stockMonitor.refresh`        | 手动触发一次刷新                                 |
+| 显示运行日志                               | `stockMonitor.showLogs`       | 打开输出面板查看请求日志                         |
 
-### 8. 股票代码书写格式
+### 9. 股票代码书写格式
 
 添加股票时支持以下写法（大小写不敏感，可含空格）：
 
@@ -229,6 +254,11 @@ npm run compile
       "changePercentBelow": -5,
     },
   ],
+  "stockMonitor.enableAnomalyAlert": true,
+  "stockMonitor.anomalyWindowSeconds": 60,
+  "stockMonitor.anomalyPriceChangePercent": 1.5,
+  "stockMonitor.anomalyVolumeRatioThreshold": 3,
+  "stockMonitor.anomalyCooldownSeconds": 300,
   "stockMonitor.statusBarAlignment": "left",
   "stockMonitor.statusBarPriority": 100,
   "stockMonitor.maxStatusBarItems": 6,
@@ -253,31 +283,36 @@ npm run compile
 }
 ```
 
-| 配置项                                  | 类型    | 默认值                                                              | 取值范围            | 说明                                                                                                                                 |
-| --------------------------------------- | ------- | ------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `stockMonitor.refreshInterval`          | number  | `10`                                                                | 5 \~ 300            | 自动刷新间隔（秒）。过小会加重网络与接口负担                                                                                         |
-| `stockMonitor.autoRefresh`              | boolean | `true`                                                              | `true` / `false`    | 是否开启定时自动刷新行情。关闭后不再定时调用行情接口，点击状态栏项或执行「立即刷新行情」仍可手动刷新                                 |
-| `stockMonitor.enableRefreshTimeRange`   | boolean | `true`                                                              | `true` / `false`    | 是否仅在 `refreshTimeRanges` 指定的时间段内自动刷新；关闭后全天自动刷新。仅约束**定时刷新**，手动刷新不受限                          |
-| `stockMonitor.refreshTimeRanges`        | array   | `[{"start":"09:00","end":"11:35"},{"start":"12:55","end":"15:05"}]` | —                   | 允许自动刷新的时间段，元素为 `{ start, end }`，24 小时制 `HH:mm`。起止均为闭区间，支持跨零点（如 `22:00-02:00`）；空数组表示不限时段 |
-| `stockMonitor.staleThresholdMultiplier` | number  | `5`                                                                 | 0 \~ 60             | 行情超过「刷新间隔 × 该倍数」未更新时标记为数据陈旧；`0` 表示不检测。仅在开启自动刷新且处于刷新时段内生效                            |
-| `stockMonitor.alerts`                   | array   | `[]`                                                                | —                   | 价格 / 涨跌幅预警规则，元素为 `{ code, above?, below?, changePercentAbove?, changePercentBelow?, once? }`                            |
-| `stockMonitor.statusBarAlignment`       | string  | `left`                                                              | `left` / `right`    | 状态栏停靠位置                                                                                                                       |
-| `stockMonitor.statusBarPriority`        | number  | `100`                                                               | —                   | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减                                                                             |
-| `stockMonitor.maxStatusBarItems`        | number  | `6`                                                                 | 1 \~ 20             | 状态栏最多展示的股票数量，收藏项优先                                                                                                 |
-| `stockMonitor.showPortfolioSummary`     | boolean | `true`                                                              | `true` / `false`    | 是否展示全部持仓的状态栏汇总项                                                                                                       |
-| `stockMonitor.portfolioSummaryLabel`    | string  | `参考盈亏`                                                          | —                   | 持仓汇总状态栏项的文案前缀，如 `参考盈亏` / `总当日盈亏`                                                                             |
-| `stockMonitor.displayFields`            | array   | `["name","price","changePercent"]`                                  | 见下表              | 状态栏展示字段及顺序（仅影响状态栏，悬浮提示始终展示完整明细）                                                                       |
-| `stockMonitor.colorScheme`              | string  | `greenUp`                                                           | `greenUp` / `redUp` | 涨跌配色方案，平盘统一为灰色                                                                                                         |
-| `stockMonitor.upColor`                  | string  | `""`                                                                | 十六进制颜色        | 全局上涨颜色；留空时回退到 `colorScheme`                                                                                             |
-| `stockMonitor.downColor`                | string  | `""`                                                                | 十六进制颜色        | 全局下跌颜色；留空时回退到 `colorScheme`                                                                                             |
-| `stockMonitor.stockColors`              | array   | `[]`                                                                | —                   | 单只股票颜色覆盖，元素为 `{ code, upColor?, downColor? }`                                                                            |
-| `stockMonitor.decimals`                 | number  | `2`                                                                 | 0 \~ 4              | 价格保留小数位数                                                                                                                     |
-| `stockMonitor.apiEndpoint`              | string  | `https://qt.gtimg.cn`                                               | —                   | 行情接口地址，可替换为自建或第三方代理                                                                                               |
-| `stockMonitor.chartApiEndpoint`         | string  | `https://web.ifzq.gtimg.cn`                                         | —                   | 图表接口地址，用于分时图 / 日K图 / 周K图 / 月K图；若默认地址不可用，可替换为支持同协议的代理                                           |
-| `stockMonitor.chartPanelFloatMode`      | boolean | `false`                                                             | `true` / `false`    | 是否以“悬浮框”方式展示图表面板。开启后在旁边打开且尽量不抢当前编辑器焦点，关闭后按普通 Webview 面板方式打开                           |
-| `stockMonitor.requestTimeout`           | number  | `5000`                                                              | 1000 \~ 30000       | 单次请求超时（毫秒）                                                                                                                 |
-| `stockMonitor.watchList`                | array   | `["sh000001","sz399001","sh600519"]`                                | —                   | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json`                                                                |
-| `stockMonitor.positions`                | array   | `[]`                                                                | —                   | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json`                 |
+| 配置项                                     | 类型    | 默认值                                                              | 取值范围            | 说明                                                                                                                                 |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `stockMonitor.refreshInterval`             | number  | `10`                                                                | 5 \~ 300            | 自动刷新间隔（秒）。过小会加重网络与接口负担                                                                                         |
+| `stockMonitor.autoRefresh`                 | boolean | `true`                                                              | `true` / `false`    | 是否开启定时自动刷新行情。关闭后不再定时调用行情接口，点击状态栏项或执行「立即刷新行情」仍可手动刷新                                 |
+| `stockMonitor.enableRefreshTimeRange`      | boolean | `true`                                                              | `true` / `false`    | 是否仅在 `refreshTimeRanges` 指定的时间段内自动刷新；关闭后全天自动刷新。仅约束**定时刷新**，手动刷新不受限                          |
+| `stockMonitor.refreshTimeRanges`           | array   | `[{"start":"09:00","end":"11:35"},{"start":"12:55","end":"15:05"}]` | —                   | 允许自动刷新的时间段，元素为 `{ start, end }`，24 小时制 `HH:mm`。起止均为闭区间，支持跨零点（如 `22:00-02:00`）；空数组表示不限时段 |
+| `stockMonitor.staleThresholdMultiplier`    | number  | `5`                                                                 | 0 \~ 60             | 行情超过「刷新间隔 × 该倍数」未更新时标记为数据陈旧；`0` 表示不检测。仅在开启自动刷新且处于刷新时段内生效                            |
+| `stockMonitor.alerts`                      | array   | `[]`                                                                | —                   | 价格 / 涨跌幅预警规则，元素为 `{ code, above?, below?, changePercentAbove?, changePercentBelow?, once? }`                            |
+| `stockMonitor.enableAnomalyAlert`          | boolean | `true`                                                              | `true` / `false`    | 是否启用异动提醒：短时急速拉升 / 跳水、A 股量比骤增（放量）时弹窗提醒。与 `alerts` 的区别见「异动提醒」小节                          |
+| `stockMonitor.anomalyWindowSeconds`        | number  | `60`                                                                | 30 \~ 600           | 异动检测的价格观察窗口（秒），比较「窗口内最早采样价」与「当前价」的涨跌幅。需积累满一个窗口的数据后才开始判断                       |
+| `stockMonitor.anomalyPriceChangePercent`   | number  | `1.5`                                                               | 0.1 \~ 20           | 观察窗口内涨跌幅超过该百分值即视为急速拉升 / 跳水；取值越小越灵敏。默认 1.5 表示 1.5%                                                |
+| `stockMonitor.anomalyVolumeRatioThreshold` | number  | `3`                                                                 | 0 \~ 50             | 量比达到该值即视为放量异动；`0` 表示关闭该项检测。量比仅 A 股提供，港股 / 美股不会触发该类型                                         |
+| `stockMonitor.anomalyCooldownSeconds`      | number  | `300`                                                               | 0 \~ 3600           | 同一只股票同类型异动的提醒冷却时间（秒），冷却期内不重复提醒；`0` 表示不冷却                                                         |
+| `stockMonitor.statusBarAlignment`          | string  | `left`                                                              | `left` / `right`    | 状态栏停靠位置                                                                                                                       |
+| `stockMonitor.statusBarPriority`           | number  | `100`                                                               | —                   | 状态栏优先级，数值越大越靠前；多只股票按关注顺序依次递减                                                                             |
+| `stockMonitor.maxStatusBarItems`           | number  | `6`                                                                 | 1 \~ 20             | 状态栏最多展示的股票数量，收藏项优先                                                                                                 |
+| `stockMonitor.showPortfolioSummary`        | boolean | `true`                                                              | `true` / `false`    | 是否展示全部持仓的状态栏汇总项                                                                                                       |
+| `stockMonitor.portfolioSummaryLabel`       | string  | `参考盈亏`                                                          | —                   | 持仓汇总状态栏项的文案前缀，如 `参考盈亏` / `总当日盈亏`                                                                             |
+| `stockMonitor.displayFields`               | array   | `["name","price","changePercent"]`                                  | 见下表              | 状态栏展示字段及顺序（仅影响状态栏，悬浮提示始终展示完整明细）                                                                       |
+| `stockMonitor.colorScheme`                 | string  | `greenUp`                                                           | `greenUp` / `redUp` | 涨跌配色方案，平盘统一为灰色                                                                                                         |
+| `stockMonitor.upColor`                     | string  | `""`                                                                | 十六进制颜色        | 全局上涨颜色；留空时回退到 `colorScheme`                                                                                             |
+| `stockMonitor.downColor`                   | string  | `""`                                                                | 十六进制颜色        | 全局下跌颜色；留空时回退到 `colorScheme`                                                                                             |
+| `stockMonitor.stockColors`                 | array   | `[]`                                                                | —                   | 单只股票颜色覆盖，元素为 `{ code, upColor?, downColor? }`                                                                            |
+| `stockMonitor.decimals`                    | number  | `2`                                                                 | 0 \~ 4              | 价格保留小数位数                                                                                                                     |
+| `stockMonitor.apiEndpoint`                 | string  | `https://qt.gtimg.cn`                                               | —                   | 行情接口地址，可替换为自建或第三方代理                                                                                               |
+| `stockMonitor.chartApiEndpoint`            | string  | `https://web.ifzq.gtimg.cn`                                         | —                   | 图表接口地址，用于分时图 / 日K图 / 周K图 / 月K图；若默认地址不可用，可替换为支持同协议的代理                                         |
+| `stockMonitor.chartPanelFloatMode`         | boolean | `false`                                                             | `true` / `false`    | 是否以“悬浮框”方式展示图表面板。开启后在旁边打开且尽量不抢当前编辑器焦点，关闭后按普通 Webview 面板方式打开                          |
+| `stockMonitor.requestTimeout`              | number  | `5000`                                                              | 1000 \~ 30000       | 单次请求超时（毫秒）                                                                                                                 |
+| `stockMonitor.watchList`                   | array   | `["sh000001","sz399001","sh600519"]`                                | —                   | 关注列表主配置；命令面板/侧边栏中的增删操作会同步写回 `settings.json`                                                                |
+| `stockMonitor.positions`                   | array   | `[]`                                                                | —                   | 持仓配置，元素为 `{ code, alias?, costPrice?, shares? }`；命令 `stockMonitor.setPosition` 会同步写回 `settings.json`                 |
 
 `displayFields` 可用字段：
 

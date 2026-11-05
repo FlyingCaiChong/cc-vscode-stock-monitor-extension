@@ -2,7 +2,7 @@
   "name": "vscode-stock-monitor-extension",
   "displayName": "Stock Monitor",
   "description": "在 VS Code 状态栏实时监控 A股 / 港股 / 美股行情，支持自选列表、收藏、持仓收益与涨跌配色",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "publisher": "FlyingCaiChong",
   "license": "MIT",
   "icon": "images/stock_icon.png",
@@ -198,6 +198,44 @@
               }
             ]
           ]
+        },
+        "stockMonitor.enableAnomalyAlert": {
+          "type": "boolean",
+          "order": 7,
+          "default": true,
+          "markdownDescription": "是否启用**异动提醒**：行情出现短时急速拉升 / 跳水，或 A 股量比骤增（放量）时弹窗提醒。默认 `true`。\n\n与 `stockMonitor.alerts` 的区别：价格预警关注**绝对阈值**（如价格上破 1600），条件成立期间状态栏持续高亮；异动提醒关注**短时相对变化**，属于瞬时事件，提醒一次后进入冷却。"
+        },
+        "stockMonitor.anomalyWindowSeconds": {
+          "type": "number",
+          "order": 8,
+          "default": 60,
+          "minimum": 30,
+          "maximum": 600,
+          "markdownDescription": "异动检测的价格观察窗口（秒），取值范围 30 ~ 600。比较「窗口内最早采样价」与「当前价」的涨跌幅。默认 `60`，即统计最近 60 秒内的价格变化。\n\n需积累满一个窗口的行情数据后才会开始判断，避免刚启动监控时误报。"
+        },
+        "stockMonitor.anomalyPriceChangePercent": {
+          "type": "number",
+          "order": 9,
+          "default": 1.5,
+          "minimum": 0.1,
+          "maximum": 20,
+          "markdownDescription": "观察窗口内涨跌幅超过该百分数值即视为**急速拉升 / 跳水**，如 `1.5` 表示 1.5%。取值越小越灵敏。默认 `1.5`。"
+        },
+        "stockMonitor.anomalyVolumeRatioThreshold": {
+          "type": "number",
+          "order": 10,
+          "default": 3,
+          "minimum": 0,
+          "maximum": 50,
+          "markdownDescription": "量比达到该值即视为**放量异动**。取 `0` 表示关闭该项检测。默认 `3`。\n\n注意：量比仅 A 股（沪 / 深 / 北交所）行情接口提供，港股与美股不会触发该类型异动。"
+        },
+        "stockMonitor.anomalyCooldownSeconds": {
+          "type": "number",
+          "order": 11,
+          "default": 300,
+          "minimum": 0,
+          "maximum": 3600,
+          "markdownDescription": "同一只股票同类型异动的提醒冷却时间（秒），冷却期内不重复提醒。取 `0` 表示不冷却。默认 `300`（5 分钟）。"
         },
         "stockMonitor.statusBarAlignment": {
           "type": "string",

@@ -1,6 +1,13 @@
 import * as vscode from "vscode";
 import { evaluateAlerts } from "./alerts";
 import {
+  AnomalyEvent,
+  AnomalySettings,
+  createAnomalyState,
+  detectAnomalies,
+  resetAnomalyState,
+} from "./anomaly";
+import {
   CONFIG_SECTION,
   onConfigChanged,
   readConfig,
@@ -109,6 +116,12 @@ class StockMonitorController implements vscode.Disposable {
    * 条件恢复（如价格回落）后会自动移除，从而重新武装、可再次提醒，避免持续刷屏。
    */
   private readonly notifiedAlerts = new Set<string>();
+
+  /**
+   * 异动检测器的运行时状态（采样历史与冷却记录）。
+   * 与价格预警不同，异动是瞬时事件，不需要在状态栏保留高亮状态。
+   */
+  private readonly anomalyState = createAnomalyState();
 
   /** 启动时是否需要把旧版持仓缓存回填到 settings.json */
   private needsPositionConfigBackfill = false;
@@ -255,6 +268,60 @@ class StockMonitorController implements vscode.Disposable {
     }
   }
 
+  /** 从当前配置中提取异动提醒设置 */
+  private anomalySettings(): AnomalySettings {
+    return {
+      enabled: this.config.enableAnomalyAlert,
+      windowSeconds: this.config.anomalyWindowSeconds,
+      priceChangePercent: this.config.anomalyPriceChangePercent,
+      volumeRatioThreshold: this.config.anomalyVolumeRatioThreshold,
+      cooldownSeconds: this.config.anomalyCooldownSeconds,
+    };
+  }
+
+  /**
+   * 检测行情异动并逐条提醒。
+   *
+   * 与价格预警的区别：异动是「短时相对变化」的瞬时事件，只在命中那一刻提醒一次，
+   * 冷却期内不再重复提醒，也不在状态栏留下持续高亮。
+   */
+  private evaluateAnomalies(): void {
+    const events = detectAnomalies(
+      this.quotes,
+      this.anomalySettings(),
+      this.anomalyState,
+      Date.now(),
+    );
+    for (const event of events) {
+      void this.notifyAnomaly(event);
+    }
+  }
+
+  /** 弹出异动提醒，并提供「查看图表」入口（同时写入日志，便于回溯） */
+  private async notifyAnomaly(event: AnomalyEvent): Promise<void> {
+    try {
+      const name =
+        this.positions.get(event.key)?.alias ||
+        this.quotes.get(event.key)?.name ||
+        event.key;
+      const message = `Stock Monitor 异动：${name} ${event.message}`;
+      logger.warn(message);
+      const choice = await vscode.window.showInformationMessage(
+        message,
+        "查看图表",
+      );
+      if (choice !== "查看图表") {
+        return;
+      }
+      const stock = this.store.list().find((item) => item.key === event.key);
+      if (stock) {
+        await this.openChart(stock);
+      }
+    } catch (err) {
+      logger.error("弹出异动提醒失败", err);
+    }
+  }
+
   /** 弹出预警提醒（同时写入日志，便于回溯） */
   private notifyAlert(key: string, reasons: readonly string[]): void {
     const name =
@@ -367,6 +434,7 @@ class StockMonitorController implements vscode.Disposable {
       this.service.clear();
       this.alertHits = new Map();
       this.notifiedAlerts.clear();
+      resetAnomalyState(this.anomalyState);
       this.render();
       return;
     }
@@ -386,6 +454,8 @@ class StockMonitorController implements vscode.Disposable {
       }
       // 先评估预警（更新高亮与弹窗状态），再渲染，保证状态栏与提示同步
       this.evaluateAlertRules();
+      // 异动检测依赖连续采样，需在每轮行情更新后执行
+      this.evaluateAnomalies();
       this.render();
       await this.chartPanel.refreshVisible();
       if (error) {
