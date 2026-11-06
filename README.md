@@ -660,6 +660,11 @@ settings.json (watchList / positions)
 
 ## 相关链接
 
+**源码与反馈**
+
+- [GitHub 仓库](https://github.com/FlyingCaiChong/cc-vscode-stock-monitor-extension)：插件源码与版本记录
+- [问题反馈（Issues）](https://github.com/FlyingCaiChong/cc-vscode-stock-monitor-extension/issues)：提交 Bug 或功能建议
+
 **项目内文档**
 
 - [更新日志（CHANGELOG.md）](./CHANGELOG.md)：各版本变更与新增功能
