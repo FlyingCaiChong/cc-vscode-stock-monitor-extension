@@ -5,6 +5,14 @@
   "version": "1.1.8",
   "publisher": "FlyingCaiChong",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FlyingCaiChong/cc-vscode-stock-monitor-extension.git"
+  },
+  "homepage": "https://github.com/FlyingCaiChong/cc-vscode-stock-monitor-extension#readme",
+  "bugs": {
+    "url": "https://github.com/FlyingCaiChong/cc-vscode-stock-monitor-extension/issues"
+  },
   "icon": "images/stock_icon.png",
   "engines": {
     "vscode": "^1.90.0"
@@ -527,7 +535,7 @@
     "test:unit": "mocha --ui tdd \"out/test/unit/**/*.test.js\"",
     "pretest": "npm run compile && npm run lint",
     "test": "vscode-test",
-    "vsix": "vsce package --allow-missing-repository"
+    "vsix": "vsce package"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
